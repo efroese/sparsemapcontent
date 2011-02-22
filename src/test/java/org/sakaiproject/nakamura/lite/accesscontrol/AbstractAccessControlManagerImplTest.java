@@ -129,7 +129,7 @@ public abstract class AbstractAccessControlManagerImplTest {
       AccessControlManagerImpl accessControlManagerImpl = new AccessControlManagerImpl(client,
               currentUser, configuration, null,  new LoggingStorageListener());
       AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser, client,
-          configuration, accessControlManagerImpl, null,  new LoggingStorageListener());
+          configuration, accessControlManagerImpl, null,  new LoggingStorageListener(), null);
       authorizableManager.createUser(u3, "User 3", "test",
           ImmutableMap.of("test", (Object)"test"));
 
@@ -211,7 +211,7 @@ public abstract class AbstractAccessControlManagerImplTest {
                 sortToArray(acl.keySet()));
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser, client,
-                configuration, accessControlManagerImpl, null,  new LoggingStorageListener());
+                configuration, accessControlManagerImpl, null,  new LoggingStorageListener(), null);
         authorizableManager.createUser(u1, "User 1", "test",
                 ImmutableMap.of("test", (Object)"test"));
         authorizableManager.createUser(u2, "User 2", "test",

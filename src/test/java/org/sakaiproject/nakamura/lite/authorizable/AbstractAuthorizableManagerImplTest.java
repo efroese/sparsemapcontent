@@ -92,7 +92,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                 currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         Assert.assertNotNull(authorizableManager.findAuthorizable(User.ADMIN_USER));
         Assert.assertNotNull(authorizableManager.findAuthorizable(User.ANON_USER));
@@ -127,7 +127,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                 currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         Authorizable a = authorizableManager.findAuthorizable(User.ADMIN_USER);
         Authorizable an = authorizableManager.findAuthorizable(User.ANON_USER);
@@ -161,7 +161,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                 currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         authorizableManager.delete("testuser");
 
@@ -195,7 +195,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                 currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         authorizableManager.delete("testuser2");
 
@@ -219,7 +219,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
         AccessControlManagerImpl userAccessControlManagerImpl = new AccessControlManagerImpl(
                 client, user, configuration, sharedCache,  new LoggingStorageListener());
         AuthorizableManagerImpl userAuthorizableManager = new AuthorizableManagerImpl(user, client,
-                configuration, userAccessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                configuration, userAccessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         try {
             userAuthorizableManager.createUser("testuser3", "Test User", "test", ImmutableMap.of(
@@ -250,7 +250,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                 currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         authorizableManager.delete("user2");
         authorizableManager.delete("user3");
@@ -341,7 +341,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                     client, currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
             AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                    client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                    client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
             for (int i = 0; i < 10; i++) {
                 authorizableManager.delete("testfinduser" + i);
@@ -412,7 +412,7 @@ public abstract class AbstractAuthorizableManagerImplTest {
                 currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
         AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
         authorizableManager.delete("testuser");
 

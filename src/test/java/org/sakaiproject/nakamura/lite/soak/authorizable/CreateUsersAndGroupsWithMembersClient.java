@@ -63,7 +63,7 @@ public class CreateUsersAndGroupsWithMembersClient extends AbstractScalingClient
                     client, currentUser, configuration, sharedCache,  new LoggingStorageListener());
 
             AuthorizableManagerImpl authorizableManager = new AuthorizableManagerImpl(currentUser,
-                    client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener());
+                    client, configuration, accessControlManagerImpl, sharedCache,  new LoggingStorageListener(), null);
 
             List<String> userNames = Lists.newArrayList();
             List<String> groupNames = Lists.newArrayList();

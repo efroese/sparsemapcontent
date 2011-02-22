@@ -17,6 +17,8 @@
  */
 package org.sakaiproject.nakamura.lite;
 
+import java.util.Collection;
+
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.Repository;
@@ -27,6 +29,7 @@ import org.sakaiproject.nakamura.api.lite.StoreListener;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.Authenticator;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
+import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManagerPlugin;
 import org.sakaiproject.nakamura.lite.accesscontrol.AccessControlManagerImpl;
 import org.sakaiproject.nakamura.lite.accesscontrol.AuthenticatorImpl;
 import org.sakaiproject.nakamura.lite.authorizable.AuthorizableManagerImpl;
@@ -46,7 +49,8 @@ public class SessionImpl implements Session {
     private StoreListener storeListener;
 
     public SessionImpl(Repository repository, User currentUser, StorageClient client,
-            Configuration configuration, StorageCacheManager storageCacheManager, StoreListener storeListener)
+            Configuration configuration, StorageCacheManager storageCacheManager, StoreListener storeListener,
+            Collection <AuthorizableManagerPlugin> authorizableManagerPlugins)
             throws ClientPoolException, StorageClientException, AccessDeniedException {
         this.currentUser = currentUser;
         this.repository = repository;
@@ -54,7 +58,7 @@ public class SessionImpl implements Session {
         accessControlManager = new AccessControlManagerImpl(client, currentUser, configuration,
                 storageCacheManager.getAccessControlCache(), storeListener);
         authorizableManager = new AuthorizableManagerImpl(currentUser, client, configuration,
-                accessControlManager, storageCacheManager.getAuthorizableCache(), storeListener);
+                accessControlManager, storageCacheManager.getAuthorizableCache(), storeListener, authorizableManagerPlugins);
 
         contentManager = new ContentManagerImpl(client, accessControlManager, configuration, storageCacheManager.getContentCache(), storeListener);
 

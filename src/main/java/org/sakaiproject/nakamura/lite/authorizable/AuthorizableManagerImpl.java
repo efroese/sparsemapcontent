@@ -20,6 +20,7 @@ package org.sakaiproject.nakamura.lite.authorizable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
@@ -34,6 +35,7 @@ import org.sakaiproject.nakamura.api.lite.accesscontrol.Permissions;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.Security;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
+import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManagerPlugin;
 import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.lite.util.PreemptiveIterator;
@@ -44,12 +46,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * An Authourizable Manager bound to a user, on creation the user ID specified
+ * An Authorizable Manager bound to a user, on creation the user ID specified
  * by the caller is trusted.
  *
  * @author ieb
@@ -71,10 +74,12 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
     private boolean closed;
     private Authenticator authenticator;
     private StoreListener storeListener;
+    private Collection<AuthorizableManagerPlugin> authorizableManagerPlugins;
 
     public AuthorizableManagerImpl(User currentUser, StorageClient client,
             Configuration configuration, AccessControlManager accessControlManager,
-            Map<String, CacheHolder> sharedCache, StoreListener storeListener) throws StorageClientException,
+            Map<String, CacheHolder> sharedCache, StoreListener storeListener,
+            Collection<AuthorizableManagerPlugin> authorizableManagerPlugins ) throws StorageClientException,
             AccessDeniedException {
         super(client, sharedCache);
         this.currentUserId = currentUser.getId();
@@ -89,6 +94,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         this.authenticator = new AuthenticatorImpl(client, configuration);
         this.closed = false;
         this.storeListener = storeListener;
+        this.authorizableManagerPlugins = authorizableManagerPlugins;
     }
 
     public User getUser() {
@@ -105,18 +111,38 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             accessControlManager.check(Security.ZONE_AUTHORIZABLES, authorizableId,
                     Permissions.CAN_READ);
         }
+        
+        Authorizable authorizable = null;
 
         Map<String, Object> authorizableMap = getCached(keySpace, authorizableColumnFamily,
                 authorizableId);
-        if (authorizableMap == null || authorizableMap.isEmpty()) {
-            return null;
+        // Check the list of AuthorizableManagerPlugins for a hit.
+        if (authorizableMap != null && !authorizableMap.isEmpty()) {
+        	if (isAUser(authorizableMap)) {
+                authorizable = new UserInternal(authorizableMap, false);
+            } else if (isAGroup(authorizableMap)) {
+            	authorizable = new GroupInternal(authorizableMap, false);
+            }
         }
-        if (isAUser(authorizableMap)) {
-            return new UserInternal(authorizableMap, false);
-        } else if (isAGroup(authorizableMap)) {
-            return new GroupInternal(authorizableMap, false);
+        else if (authorizableManagerPlugins != null) {
+        	for (AuthorizableManagerPlugin amp : authorizableManagerPlugins ){
+        		if (amp.handles(authorizableId)){
+        			authorizable = amp.findAuthorizable(authorizableId);
+        			// The first AuthorizableManagerPlugin to respond wins
+       				if (authorizable != null ){
+       					break;
+       				}
+       			}
+       		}
         }
-        return null;
+
+        if (authorizable != null ){
+            Map<String, Object> encodedProperties = StorageClientUtils
+            	.getFilteredAndEcodedMap(authorizable.getPropertiesForUpdate(),FILTER_ON_UPDATE);
+            putCached(keySpace, authorizableColumnFamily, authorizable.getId(),
+                encodedProperties, authorizable.isNew());
+        }
+        return authorizable;
     }
 
     public void updateAuthorizable(Authorizable authorizable) throws AccessDeniedException,
@@ -228,6 +254,14 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         encodedProperties.put(Authorizable.LASTMODIFIED_FIELD,System.currentTimeMillis());
         encodedProperties.put(Authorizable.LASTMODIFIED_BY_FIELD,accessControlManager.getCurrentUserId());
         putCached(keySpace, authorizableColumnFamily, id, encodedProperties, authorizable.isNew());
+        
+        if( authorizableManagerPlugins != null ) {
+        	for (AuthorizableManagerPlugin amp : authorizableManagerPlugins ){
+        		if (amp.handles(authorizable.getId())){
+        			amp.updateAuthorizable(authorizable);
+        		}
+        	}
+        }
 
         authorizable.reset(getCached(keySpace, authorizableColumnFamily, id));
 
@@ -288,7 +322,18 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             m.put(Authorizable.AUTHORIZABLE_TYPE_FIELD, Authorizable.USER_VALUE);
             properties = m;
         }
-        return createAuthorizable(authorizableId, authorizableName, password, properties);
+        
+        boolean created = createAuthorizable(authorizableId, authorizableName, password, properties);
+        
+        if (authorizableManagerPlugins != null) {
+        	for (AuthorizableManagerPlugin amp: authorizableManagerPlugins){
+        		if (amp.handles(authorizableId) && 
+        				amp.createUser(authorizableId, authorizableName, password, properties)){
+        			created = true;
+        		}
+        	}
+        }
+        return created;
     }
 
     public boolean createGroup(String authorizableId, String authorizableName,
@@ -302,16 +347,35 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             m.put(Authorizable.AUTHORIZABLE_TYPE_FIELD, Authorizable.GROUP_VALUE);
             properties = m;
         }
-        return createAuthorizable(authorizableId, authorizableName, null, properties);
+        
+        boolean created = createAuthorizable(authorizableId, authorizableName, null, properties);
+        if (authorizableManagerPlugins != null) {
+        	for (AuthorizableManagerPlugin amp: authorizableManagerPlugins){
+        		if (amp.handles(authorizableId) && 
+        				amp.createGroup(authorizableId, authorizableName, properties)){
+        			created = true;
+        		}
+        	}
+        }
+        return created;
     }
 
+   
     public void delete(String authorizableId) throws AccessDeniedException, StorageClientException {
         checkOpen();
         accessControlManager.check(Security.ZONE_ADMIN, authorizableId, Permissions.CAN_DELETE);
         removeFromCache(keySpace, authorizableColumnFamily, authorizableId);
         client.remove(keySpace, authorizableColumnFamily, authorizableId);
         storeListener.onDelete(Security.ZONE_AUTHORIZABLES, authorizableId, accessControlManager.getCurrentUserId());
-
+        
+        // TODO: Is this necessary?
+        if( authorizableManagerPlugins != null ) {
+	        for (AuthorizableManagerPlugin amp: authorizableManagerPlugins) {
+	        	if (amp.handles(authorizableId)) {
+	        		amp.delete(authorizableId);
+	        	}
+	        }
+        }
     }
 
     public void close() {
@@ -353,6 +417,12 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                     currentUserId);
         }
 
+        // TODO: Is this needed? It's not a likely scenario that sakai would be the canonical password store. 
+        if( authorizableManagerPlugins != null ) {
+	        for (AuthorizableManager am: authorizableManagerPlugins ) {
+	        	am.changePassword(authorizable, password, oldPassword);
+	        }
+        }
     }
 
     public Iterator<Authorizable> findAuthorizable(String propertyName, String value,
@@ -369,7 +439,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         final Iterator<Map<String, Object>> authMaps = client.find(keySpace,
                 authorizableColumnFamily, builder.build());
 
-        return new PreemptiveIterator<Authorizable>() {
+        Iterator<Authorizable> authorizables =  new PreemptiveIterator<Authorizable>() {
 
             private Authorizable authorizable;
 
@@ -389,8 +459,11 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                             if (isAUser(authMap)) {
                                 authorizable = new UserInternal(authMap, false);
                                 return true;
-                            } else if (isAGroup(authMap))
+                            } else if (isAGroup(authMap)){
                                 authorizable = new GroupInternal(authMap, false);
+                            }
+                            
+                            
                             return true;
                         } catch (AccessDeniedException e) {
                             LOGGER.debug("Search result filtered ", e.getMessage());
@@ -401,7 +474,6 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
 
                     }
                 }
-
                 authorizable = null;
                 return false;
             }
@@ -412,6 +484,16 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
 
 
         };
+        
+        if( authorizableManagerPlugins != null ) {
+        	Iterator<AuthorizableManagerPlugin> authManagerIter = authorizableManagerPlugins.iterator();
+        	while (!authorizables.hasNext()){
+        		authorizables = Iterators.concat(authorizables,	
+        				authManagerIter.next().findAuthorizable(propertyName, value, authorizableType));
+        	}
+        }
+
+        return authorizables;
     }
 
 
@@ -443,6 +525,4 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
     protected Logger getLogger() {
         return LOGGER;
     }
-
-
 }
