@@ -13,6 +13,6 @@ public interface AuthorizableManagerPluginFactory {
 	/**
 	 * @return an instance of a specific {@link AuthorizableManagerPlugin}
 	 */
-	AuthorizableManagerPlugin getAuthorizableManagerPlugin();
+	public AuthorizableManagerPlugin getAuthorizableManagerPlugin();
 
 }
