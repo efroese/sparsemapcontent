@@ -174,7 +174,10 @@ public class RepositoryImpl implements Repository {
 		if (authorizableManagerPluginFactories != null){
 			amps = new ArrayList<AuthorizableManagerPlugin>();
 			for (AuthorizableManagerPluginFactory ampf : authorizableManagerPluginFactories ){
-				amps.add(ampf.getAuthorizableManagerPlugin());
+				AuthorizableManagerPlugin amp = ampf.getAuthorizableManagerPlugin();
+				if (amp != null) {
+					amps.add(amp);
+				}
 			}
 		}
 		return amps;
