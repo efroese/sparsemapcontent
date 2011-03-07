@@ -61,9 +61,7 @@ public class RepositoryImpl implements Repository {
 
     @Reference(cardinality = ReferenceCardinality.OPTIONAL_MULTIPLE,
             referenceInterface = AuthorizableManagerPluginFactory.class,
-            policy = ReferencePolicy.DYNAMIC,
-            bind = "addAuthorizableManagerPluginFactory",
-            unbind = "removeAuthorizableManagerPluginFactory")
+            policy = ReferencePolicy.DYNAMIC)
     protected Collection<AuthorizableManagerPluginFactory> authorizableManagerPluginFactories = 
             new CopyOnWriteArrayList<AuthorizableManagerPluginFactory>();
 
@@ -200,7 +198,7 @@ public class RepositoryImpl implements Repository {
      * when a new {@link AuthorizableManagerPluginFactory} {@link Service} is registered. 
      * @param ampf the {@link AuthorizableManagerPluginFactory} to be added.
      */
-    public void addAuthorizableManagerPluginFactory(AuthorizableManagerPluginFactory ampf){
+    public void bindAuthorizableManagerPluginFactory(AuthorizableManagerPluginFactory ampf){
         authorizableManagerPluginFactories.add(ampf);
     }
 
@@ -209,7 +207,7 @@ public class RepositoryImpl implements Repository {
      * when a {@link AuthorizableManagerPluginFactory} {@link Service} is unregistered. 
      * @param ampf the {@link AuthorizableManagerPluginFactory} to be removed.
      */
-    public void removeAuthorizableManagerPluginFactory(AuthorizableManagerPluginFactory ampf){
+    public void unbindAuthorizableManagerPluginFactory(AuthorizableManagerPluginFactory ampf){
         authorizableManagerPluginFactories.remove(ampf);
     }
 
