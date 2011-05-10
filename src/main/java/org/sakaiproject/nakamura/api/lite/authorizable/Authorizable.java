@@ -239,13 +239,7 @@ public class Authorizable {
      */
     public void setProperty(String name, Object value) {
         if (!readOnly && !FILTER_PROPERTIES.contains(name)) {
-            Object cv = authorizableMap.get(name);
-            if (!value.equals(cv)) {
-                modifiedMap.put(name, value);
-            } else if (modifiedMap.containsKey(name) && !value.equals(modifiedMap.get(name))) {
-                modifiedMap.put(name, value);
-            }
-
+        	modifiedMap.put(name, value);
         }
     }
 
