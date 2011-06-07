@@ -14,6 +14,7 @@ import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
 import com.mongodb.DB;
+import com.mongodb.DBCollection;
 import com.mongodb.Mongo;
 import com.mongodb.MongoException;
 import com.mongodb.MongoURI;
@@ -22,7 +23,7 @@ import com.mongodb.MongoURI;
 @Service
 public class MongoClientPool implements StorageClientPool {
 
-	public static final String[] SPARSE_COLLECTION_NAMES = { "AU", "AC", "CN" };
+	public static final String[] SPARSE_COLLECTION_NAMES = { "au", "ac", "cn" };
 
 	protected Mongo mongo;
 	protected DB db;
@@ -47,9 +48,11 @@ public class MongoClientPool implements StorageClientPool {
 		this.db = mongo.getDB(StorageClientUtils.getSetting(props.get(PROP_MONGO_DB), DEFAULT_MONGO_DB));
 		this.props = props;
 
-		for (String collectionName: SPARSE_COLLECTION_NAMES){
-			if (!db.collectionExists(collectionName)){
-				db.createCollection(collectionName, null);
+		for (String name: SPARSE_COLLECTION_NAMES){
+			if (!db.collectionExists(name)){
+				db.createCollection(name, null);
+				DBCollection collection = db.getCollection(name);
+				collection.ensureIndex("id");
 			}
 		}
 	}
