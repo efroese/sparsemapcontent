@@ -54,7 +54,7 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		// Pretty straightforward. Just query by the _id.
 		BasicDBObject query = new BasicDBObject();
-		query.put("_id", key);
+		query.put("id", key);
 		DBCursor cursor = collection.find(query);
 		Map<String,Object> result = null;
 		if (cursor.size() == 1){
@@ -76,7 +76,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject();
-		query.put("_id", key);
+		query.put("id", key);
 		collection.remove(query);
 	}
 
