@@ -237,6 +237,12 @@
 	  <artifactId>postgresql</artifactId>
 	  <version>9.0-801.jdbc4</version>    
     </dependency>
+
+    <dependency>
+        <groupId>org.mongodb</groupId>
+        <artifactId>mongo-java-driver</artifactId>
+        <version>2.6.2</version>
+    </dependency>
 <!--
     To use Oracle, install ojdbc14.jar to your local mvn
     repository and then uncomment the dependency below.
