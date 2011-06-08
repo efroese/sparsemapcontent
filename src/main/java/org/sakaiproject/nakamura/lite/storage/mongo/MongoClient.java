@@ -65,6 +65,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		return result;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#insert(java.lang.String, java.lang.String, java.lang.String, java.util.Map, boolean)
+	 */
 	public void insert(String keySpace, String columnFamily, String key,
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
@@ -90,6 +94,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		return cleaned.build();
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#remove(java.lang.String, java.lang.String, java.lang.String)
+	 */
 	public void remove(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
@@ -98,6 +106,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		collection.remove(query);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#streamBodyOut(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.util.Map)
+	 */
 	public InputStream streamBodyOut(String keySpace, String columnFamily,
 			String contentId, String contentBlockId, String streamId,
 			Map<String, Object> content) throws StorageClientException,
@@ -105,6 +117,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		return streamedContentHelper.readBody(keySpace, columnFamily, contentBlockId, streamId, content);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#streamBodyIn(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.util.Map, java.io.InputStream)
+	 */
 	public Map<String, Object> streamBodyIn(String keySpace,
 			String columnFamily, String contentId, String contentBlockId,
 			String streamId, Map<String, Object> content, InputStream in)
@@ -113,6 +129,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		return meta;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#find(java.lang.String, java.lang.String, java.util.Map)
+	 */
 	@SuppressWarnings("unchecked")
 	public Iterator<Map<String, Object>> find(String keySpace,
 			String columnFamily, Map<String, Object> properties)
@@ -126,21 +146,37 @@ public class MongoClient implements StorageClient, RowHasher {
 		return (Iterator<Map<String, Object>>) itr;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#close()
+	 */
 	public void close() {
 		log.debug("Closed");
 		this.mongodb.requestDone();
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#listChildren(java.lang.String, java.lang.String, java.lang.String)
+	 */
 	public DisposableIterator<Map<String, Object>> listChildren(
 			String keySpace, String columnFamily, String key)
 			throws StorageClientException {
 		return null;
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#hasBody(java.util.Map, java.lang.String)
+	 */
 	public boolean hasBody(Map<String, Object> content, String streamId) {
 		return streamedContentHelper.hasStream(content, streamId);
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.sakaiproject.nakamura.lite.storage.RowHasher#rowHash(java.lang.String, java.lang.String, java.lang.String)
+	 */
 	public String rowHash(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
 		MessageDigest hasher;
