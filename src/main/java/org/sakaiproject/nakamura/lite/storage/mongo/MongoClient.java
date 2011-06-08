@@ -8,11 +8,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.lite.content.FileStreamContentHelper;
-import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.content.StreamedContentHelper;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
 import org.sakaiproject.nakamura.lite.storage.RowHasher;
@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -32,6 +33,7 @@ public class MongoClient implements StorageClient, RowHasher {
 
 	private DB mongodb;
 
+	// Reads and Writes file content to a filesystem.
 	private StreamedContentHelper streamedContentHelper;
 
 	public MongoClient(DB mongodb, Map<String,Object> props) {
@@ -52,7 +54,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			String key) throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
-		// Pretty straightforward. Just query by the _id.
+		// Pretty straightforward. Just query by the id.
 		BasicDBObject query = new BasicDBObject();
 		query.put("id", key);
 		DBCursor cursor = collection.find(query);
@@ -68,8 +70,24 @@ public class MongoClient implements StorageClient, RowHasher {
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject toInsert = new BasicDBObject();
-		MongoClientUtils.copyToDBObject(toInsert, values);
+		MongoClientUtils.copyToDBObject(toInsert, cleanProperties(values));
 		collection.insert(toInsert);
+	}
+
+	/**
+	 * This is a nasty, dirty, evil hack to see some tests work before I go out the door.
+	 * @param props
+	 * @return the cleaned props
+	 */
+	private Map<String, Object> cleanProperties(Map<String, Object> props) {
+		Builder<String, Object> cleaned = new ImmutableMap.Builder<String, Object>();
+		for(String key : props.keySet()){
+			Object val = props.get(key);
+			if (!(val instanceof RemoveProperty)){
+				cleaned.put(key, val);
+			}
+		}
+		return cleaned.build();
 	}
 
 	public void remove(String keySpace, String columnFamily, String key)
