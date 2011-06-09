@@ -13,6 +13,7 @@ import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.Mongo;
@@ -36,6 +37,14 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_MONGO_DB)
 	public static final String PROP_MONGO_DB = "mongo.db";
 
+	private static final String DEFAULT_MONGO_USER = "";
+	@Property(value = DEFAULT_MONGO_USER)
+	public static final String PROP_MONGO_USER = "mongo.user";
+
+	private static final String DEFAULT_MONGO_PASSWORD = "nakamura";
+	@Property(value = DEFAULT_MONGO_PASSWORD)
+	public static final String PROP_MONGO_PASSWORD = "mongo.password";
+
 	private static final String DEFAULT_STOREBASE = "store";
 	@Property(value = DEFAULT_STOREBASE)
 	public static final String PROP_STOREBASE = "mongo.disk.storage.base";
@@ -52,7 +61,7 @@ public class MongoClientPool implements StorageClientPool {
 			if (!db.collectionExists(name)){
 				db.createCollection(name, null);
 				DBCollection collection = db.getCollection(name);
-				collection.ensureIndex("id");
+				collection.ensureIndex(new BasicDBObject("id", 1), "id_index", true);
 			}
 		}
 	}
