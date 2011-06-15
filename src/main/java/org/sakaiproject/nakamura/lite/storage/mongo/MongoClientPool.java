@@ -13,7 +13,9 @@ import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
+import com.mongodb.DBCollection;
 import com.mongodb.Mongo;
 import com.mongodb.MongoException;
 import com.mongodb.MongoURI;
@@ -56,10 +58,10 @@ public class MongoClientPool implements StorageClientPool {
 		this.props = props;
 
 		for (String name: SPARSE_COLLECTION_NAMES){
-			// Its not strictly necessary to create the collections. Mongo will do that
-			// automagically. This might be useful as we progess to configure our collections.
 			if (!db.collectionExists(name)){
 				db.createCollection(name, null);
+				DBCollection collection = db.getCollection(name);
+				collection.ensureIndex(new BasicDBObject("id", 1), "id_index", true);
 			}
 		}
 	}
