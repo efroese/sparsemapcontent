@@ -82,8 +82,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject insert = new BasicDBObject();
-		MongoClientUtils.copyToDBObject(insert, cleanProperties(values));
+		BasicDBObject insert = new BasicDBObject(cleanProperties(values));
 		insert.put("id", key);
 		BasicDBObject query = new BasicDBObject("id", key);
 		collection.update(query, insert, true, false);
