@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -67,6 +68,9 @@ public class MongoClient implements StorageClient, RowHasher {
 		if (cursor.size() == 1){
 			result = (Map<String,Object>)cursor.next();
 		}
+		if (result == null){
+			result = new HashMap<String, Object>();
+		}
 		return result;
 	}
 
@@ -83,6 +87,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		insert.put("id", key);
 		BasicDBObject query = new BasicDBObject("id", key);
 		collection.update(query, insert, true, false);
+		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
 	}
 
 	/**
