@@ -149,9 +149,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject query = new BasicDBObject();
-
-		MongoClientUtils.copyToDBObject(query, properties);
+		BasicDBObject query = new BasicDBObject(properties);
 		DBCursor cursor = collection.find(query);
 		Iterator<?> itr = (Iterator<?>)cursor.iterator();
 		return (Iterator<Map<String, Object>>) itr;
