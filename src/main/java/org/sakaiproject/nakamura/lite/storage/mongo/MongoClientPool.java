@@ -49,6 +49,33 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_STOREBASE)
 	public static final String PROP_STOREBASE = "mongo.disk.storage.base";
 
+	private static final String[] DEFAULT_INDEXED_COLS = new String[] {
+		"au:rep:principalName",
+		"au:type",
+		"cn:sling:resourceType",
+		"cn:sakai:pooled-content-manager",
+
+		"cn:sakai:messagestore",
+		"cn:sakai:type",
+		"cn:sakai:marker",
+
+		"cn:sakai:tag-uuid",
+
+		"cn:sakai:contactstorepath",
+		"cn:sakai:state",
+		"cn:firstName",
+		"cn:lastName",
+
+		"cn:_created",
+
+		"cn:sakai:category",
+		"cn:sakai:messagebox",
+		"cn:sakai:from",
+		"cn:sakai:subject",
+	};
+	@Property()
+	public static final String PROP_INDEXED_COLS = "mongo.indexed.cols";
+
 	private Map<String,Object> props;
 
 	@Activate
@@ -63,6 +90,16 @@ public class MongoClientPool implements StorageClientPool {
 				DBCollection collection = db.getCollection(name);
 				collection.ensureIndex(new BasicDBObject("id", 1), "id_index", true);
 			}
+		}
+
+		DBCollection collection;
+		String[] keysToIndex = StorageClientUtils.getSetting(props.get(PROP_INDEXED_COLS), DEFAULT_INDEXED_COLS);
+		for (String toIndex: keysToIndex){
+			int firstColon = toIndex.indexOf(':');
+			String columnFamily = toIndex.substring(0, firstColon);
+			String columnName = toIndex.substring(firstColon + 1);
+			collection = db.getCollection(columnFamily);
+			collection.ensureIndex(columnName);
 		}
 	}
 
