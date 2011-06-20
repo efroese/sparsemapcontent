@@ -6,10 +6,15 @@ import java.util.Map;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.ReferenceCardinality;
+import org.apache.felix.scr.annotations.ReferencePolicy;
 import org.apache.felix.scr.annotations.Service;
+import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.StorageCacheManager;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.lite.storage.ConcurrentLRUMap;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
@@ -73,16 +78,37 @@ public class MongoClientPool implements StorageClientPool {
 		"cn:sakai:from",
 		"cn:sakai:subject",
 	};
-	@Property()
+	@Property
 	public static final String PROP_INDEXED_COLS = "mongo.indexed.keys";
 
+	@Reference(cardinality=ReferenceCardinality.OPTIONAL_UNARY, policy=ReferencePolicy.DYNAMIC)
+	private StorageCacheManager storageManagerCache;
+
 	private Map<String,Object> props;
+
+	private ConcurrentLRUMap<String, CacheHolder> sharedCache;
+
+	private StorageCacheManager defaultStorageManagerCache;
 
 	@Activate
 	public void activate(Map<String,Object> props) throws MongoException, UnknownHostException {
 		this.mongo = new Mongo(new MongoURI(StorageClientUtils.getSetting(props.get(PROP_MONGO_URI), DEFAULT_MONGO_URI)));
 		this.db = mongo.getDB(StorageClientUtils.getSetting(props.get(PROP_MONGO_DB), DEFAULT_MONGO_DB));
 		this.props = props;
+
+		this.sharedCache = new ConcurrentLRUMap<String, CacheHolder>(10000);
+		// this is a default cache used where none has been provided.
+        defaultStorageManagerCache = new StorageCacheManager() {
+            public Map<String, CacheHolder> getContentCache() {
+                return sharedCache;
+            }
+            public Map<String, CacheHolder> getAuthorizableCache() {
+                return sharedCache;
+            }
+            public Map<String, CacheHolder> getAccessControlCache() {
+                return sharedCache;
+            }
+        };
 
 		for (String name: SPARSE_COLLECTION_NAMES){
 			if (!db.collectionExists(name)){
@@ -108,8 +134,13 @@ public class MongoClientPool implements StorageClientPool {
 	}
 
 	public StorageCacheManager getStorageCacheManager() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+        if ( storageManagerCache != null ) {
+            if ( sharedCache.size() > 0 ) {
+                sharedCache.clear(); // dump any memory consumed by the default cache.
+            }
+            return storageManagerCache;
+        }
+        return defaultStorageManagerCache;
+    }
 
 }
