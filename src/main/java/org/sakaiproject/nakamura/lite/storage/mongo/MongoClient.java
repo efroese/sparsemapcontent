@@ -49,7 +49,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		}
 		this.mongodb.requestStart();
 
-		this.streamedContentHelper = new FileStreamContentHelper(null, props);
+		this.streamedContentHelper = new FileStreamContentHelper(this, props);
 	}
 
 	/*
