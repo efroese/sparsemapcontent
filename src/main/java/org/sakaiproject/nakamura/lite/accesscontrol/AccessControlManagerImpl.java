@@ -63,7 +63,7 @@ public class AccessControlManagerImpl extends CachingManager implements AccessCo
     private static final String _OBJECT_TYPE = "_aclType";
     private static final String _KEY = "_aclKey";
     private static final Logger LOGGER = LoggerFactory.getLogger(AccessControlManagerImpl.class);
-    private static final Set<String> PROTECTED_PROPERTIES = ImmutableSet.of(_SECRET_KEY);
+    private static final Set<String> PROTECTED_PROPERTIES = ImmutableSet.of(_SECRET_KEY, "_id", "id");
     private static final Set<String> READ_ONLY_PROPERTIES = ImmutableSet.of(_SECRET_KEY, _PATH, _OBJECT_TYPE, _KEY);
     private User user;
     private String keySpace;
@@ -123,6 +123,9 @@ public class AccessControlManagerImpl extends CachingManager implements AccessCo
         check(objectType, objectPath, Permissions.CAN_READ_ACL);
         String key = this.getAclKey(objectType, objectPath);
         Map<String, Object> currentAcl = getCached(keySpace, aclColumnFamily, key);
+        if (currentAcl == null){
+            currentAcl = Maps.newLinkedHashMap();
+        }
         // every ACL gets a secret key, which avoids doing it later with a special call
         Map<String, Object> modifications = Maps.newLinkedHashMap();
         if ( !currentAcl.containsKey(_SECRET_KEY)) {

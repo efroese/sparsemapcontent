@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -39,7 +40,12 @@ public class MongoClient implements StorageClient, RowHasher {
 	public MongoClient(DB mongodb, Map<String,Object> props) {
 		log.debug("Created");
 		this.mongodb = mongodb;
-		this.mongodb.authenticate("admin", "admin".toCharArray());
+
+		String user = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), MongoClientPool.PROP_MONGO_USER);
+		String password = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), MongoClientPool.PROP_MONGO_USER);
+		if (!"".equals(user) && !"".equals(password)){
+			this.mongodb.authenticate("admin", "admin".toCharArray());
+		}
 		this.mongodb.requestStart();
 
 		this.streamedContentHelper = new FileStreamContentHelper(null, props);
@@ -62,6 +68,9 @@ public class MongoClient implements StorageClient, RowHasher {
 		if (cursor.size() == 1){
 			result = (Map<String,Object>)cursor.next();
 		}
+		if (result == null){
+			result = new HashMap<String, Object>();
+		}
 		return result;
 	}
 
@@ -73,9 +82,11 @@ public class MongoClient implements StorageClient, RowHasher {
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject toInsert = new BasicDBObject();
-		MongoClientUtils.copyToDBObject(toInsert, cleanProperties(values));
-		collection.insert(toInsert);
+		BasicDBObject insert = new BasicDBObject(cleanProperties(values));
+		insert.put("id", key);
+		BasicDBObject query = new BasicDBObject("id", key);
+		collection.update(query, insert, true, false);
+		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
 	}
 
 	/**
@@ -138,9 +149,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject query = new BasicDBObject();
-
-		MongoClientUtils.copyToDBObject(query, properties);
+		BasicDBObject query = new BasicDBObject(properties);
 		DBCursor cursor = collection.find(query);
 		Iterator<?> itr = (Iterator<?>)cursor.iterator();
 		return (Iterator<Map<String, Object>>) itr;
