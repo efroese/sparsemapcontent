@@ -14,6 +14,7 @@ import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.lite.content.FileStreamContentHelper;
+import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.content.StreamedContentHelper;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
 import org.sakaiproject.nakamura.lite.storage.RowHasher;
@@ -84,6 +85,12 @@ public class MongoClient implements StorageClient, RowHasher {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject insert = new BasicDBObject(cleanProperties(values));
 		insert.put("id", key);
+
+		if (insert.keySet().contains(InternalContent.PATH_FIELD)) {
+			if ( !StorageClientUtils.isRoot(key)) {
+				insert.put(InternalContent.PARENT_HASH_FIELD, rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
+			}
+		}
 		BasicDBObject query = new BasicDBObject("id", key);
 		collection.update(query, insert, true, false);
 		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
@@ -145,14 +152,32 @@ public class MongoClient implements StorageClient, RowHasher {
 	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#find(java.lang.String, java.lang.String, java.util.Map)
 	 */
 	@SuppressWarnings("unchecked")
-	public Iterator<Map<String, Object>> find(String keySpace,
+	public DisposableIterator<Map<String, Object>> find(String keySpace,
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject(properties);
 		DBCursor cursor = collection.find(query);
-		Iterator<?> itr = (Iterator<?>)cursor.iterator();
-		return (Iterator<Map<String, Object>>) itr;
+		final Iterator<?> itr = (Iterator<?>)cursor.iterator();
+		
+		return new DisposableIterator<Map<String,Object>>() {
+
+			public boolean hasNext() {
+				return itr.hasNext();
+			}
+
+			public Map<String, Object> next() {
+				return (Map<String, Object>) itr.next();
+			}
+
+			public void remove() {
+				// TODO Auto-generated method stub
+			}
+
+			public void close() {
+				// TODO Auto-generated method stub
+			}
+		};
 	}
 
 	/*
@@ -171,7 +196,10 @@ public class MongoClient implements StorageClient, RowHasher {
 	public DisposableIterator<Map<String, Object>> listChildren(
 			String keySpace, String columnFamily, String key)
 			throws StorageClientException {
-		return null;
+		// this will load all child object directly.
+        String hash = rowHash(keySpace, columnFamily, key);
+        log.debug("Finding {}:{}:{} as {} ", new Object[]{keySpace,columnFamily, key, hash});
+        return find(keySpace, columnFamily, ImmutableMap.of(InternalContent.PARENT_HASH_FIELD, (Object)hash));
 	}
 
 	/*
