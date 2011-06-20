@@ -92,6 +92,12 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 		}
 		BasicDBObject query = new BasicDBObject("id", key);
+		for(String vkey: values.keySet()){
+			Object value = values.get(vkey);
+			if (value instanceof RemoveProperty) {
+				query.put(Operators.UNSET, new BasicDBObject(vkey, value));
+			}
+		}
 		collection.update(query, insert, true, false);
 		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
 	}
