@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.bson.BSONObject;
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
@@ -28,6 +29,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
 
 public class MongoClient implements StorageClient, RowHasher {
 
@@ -163,9 +165,14 @@ public class MongoClient implements StorageClient, RowHasher {
 			throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject(properties);
+
 		DBCursor cursor = collection.find(query);
+		if (properties.containsKey("_sort")){
+			query.remove("_sort");
+			cursor.sort(new BasicDBObject((String)properties.get("_sort"), 1));
+		}
+
 		final Iterator<?> itr = (Iterator<?>)cursor.iterator();
-		
 		return new DisposableIterator<Map<String,Object>>() {
 
 			public boolean hasNext() {
