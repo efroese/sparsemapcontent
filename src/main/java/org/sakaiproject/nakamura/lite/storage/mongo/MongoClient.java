@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
@@ -23,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -37,6 +35,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	private DB mongodb;
 
 	// Reads and Writes file content to a filesystem.
+	// TODO: Replace this with a GridFS helper.
 	private StreamedContentHelper streamedContentHelper;
 
 	public MongoClient(DB mongodb, Map<String,Object> props) {
@@ -83,39 +82,23 @@ public class MongoClient implements StorageClient, RowHasher {
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject insert = new BasicDBObject(cleanProperties(values));
+
+		// The document we're going to put in mongo
+		BasicDBObject insert = new BasicDBObject(MongoUtils.cleanPropertiesForInsert(values));
 		insert.put("id", key);
 
 		if (insert.keySet().contains(InternalContent.PATH_FIELD)) {
+			// Set the parent path hash for this content document
 			if ( !StorageClientUtils.isRoot(key)) {
 				insert.put(InternalContent.PARENT_HASH_FIELD, rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
 			}
 		}
+
+		// document to look for.
 		BasicDBObject query = new BasicDBObject("id", key);
-		for(String vkey: values.keySet()){
-			Object value = values.get(vkey);
-			if (value instanceof RemoveProperty) {
-				query.put(Operators.UNSET, new BasicDBObject(vkey, value));
-			}
-		}
+		// Update or insert a single document.
 		collection.update(query, insert, true, false);
 		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
-	}
-
-	/**
-	 * This is a nasty, dirty, evil hack to see some tests work before I go out the door.
-	 * @param props
-	 * @return the cleaned props
-	 */
-	private Map<String, Object> cleanProperties(Map<String, Object> props) {
-		Builder<String, Object> cleaned = new ImmutableMap.Builder<String, Object>();
-		for(String key : props.keySet()){
-			Object val = props.get(key);
-			if (!(val instanceof RemoveProperty)){
-				cleaned.put(key, val);
-			}
-		}
-		return cleaned.build();
 	}
 
 	/*
