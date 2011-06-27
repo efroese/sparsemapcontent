@@ -37,7 +37,9 @@ public class Types {
         new BigDecimalArrayType(),
         new DoubleArrayType(),
         new CalendarArrayType(),
-        new RemovePropertyType()
+        new RemovePropertyType(),
+        new LongStringArrayType(),
+        new LongStringType()
     };
     private static final Type<String> UNKNOWN_TYPE = new StringType();
     private static final Logger LOGGER = LoggerFactory.getLogger(Types.class);
@@ -207,17 +209,46 @@ public class Types {
         }
         Class<?> c = object.getClass();
         if ( typeMap.containsKey(c)) {
-            return (Type<?>) typeMap.get(c);
-        }
-        for ( Entry<Class<?>,Type<?>> e : typeMap.entrySet()) {
-            Class<?> tc = e.getKey();
-            if ( tc.isAssignableFrom(c) ) {
-                return (Type<?>) e.getValue();
+            Type<?> t = typeMap.get(c);
+            if ( t.accepts(object) ) {
+                return (Type<?>) t;
             }
         }
-        LOGGER.warn("Unknown Type For Object {}, needs to be implemented ",object);
+        for ( Entry<Class<?>,Type<?>> e : typeMap.entrySet()) {
+            Type<?> t = e.getValue();
+            if ( t.accepts(object) ) {
+                return (Type<?>) t;
+            }
+        }
+        LOGGER.warn("Unknown Type For Object {}, needs to be implemented ",object.getClass());
         return (Type<?>) UNKNOWN_TYPE;
     }
+    
+    public static byte[] toByteArray(Object o)throws IOException{
+    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+                
+        if ( o != null && !(o instanceof RemoveProperty) ) {             
+                Type<?> t = getTypeOfObject(o);
+                dos.writeInt(t.getTypeId());
+                t.save(dos, o);
+            }
+        
+        dos.flush();
+        baos.flush();
+        byte[] b = baos.toByteArray();
+        baos.close();
+        dos.close();
+        
+        return b;
+    }
+    
+    public static Object toObject(byte[] columnValue)throws IOException{
+    	DataInputStream dis = new DataInputStream(new ByteArrayInputStream(columnValue));        
+    	return lookupTypeById(dis.readInt()).load(dis);
+    	
+    }
+
 
 
 

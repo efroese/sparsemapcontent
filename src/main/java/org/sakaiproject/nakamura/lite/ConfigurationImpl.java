@@ -22,6 +22,7 @@ import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Service;
 import org.sakaiproject.nakamura.api.lite.Configuration;
+import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 
 import java.util.Map;
 
@@ -37,6 +38,24 @@ public class ConfigurationImpl implements Configuration {
     private static final String AUTHORIZABLE_COLUMN_FAMILY = "authorizable-column-family";
     @Property(value = "cn")
     private static final String CONTENT_COLUMN_FAMILY = "content-column-family";
+    
+    private static final String[] PROPERTIES_INDEX_COLUMN_NAME = {
+      "au:rep:principalName",
+      "au:type",
+      "cn:sling:resourceType",
+      "cn:sakai:pooled-content-manager",
+      "cn:sakai:messagestore",
+      "cn:sakai:type",
+      "cn:sakai:marker",
+      "cn:sakai:tag-uuid",
+      "cn:sakai:contactstorepath",
+      "cn:sakai:state",
+      "cn:_created",
+      "cn:sakai:category",
+      "cn:sakai:messagebox",
+      "cn:sakai:from",
+      "cn:sakai:subject"
+      };
 
     private String aclColumnFamily;
     private String keySpace;
@@ -45,10 +64,10 @@ public class ConfigurationImpl implements Configuration {
 
     @Activate
     public void activate(Map<String, Object> properties) {
-        aclColumnFamily = (String) properties.get(ACL_COLUMN_FAMILY);
-        keySpace = (String) properties.get(KEYSPACE);
-        authorizableColumnFamily = (String) properties.get(AUTHORIZABLE_COLUMN_FAMILY);
-        contentColumnFamily = (String) properties.get(CONTENT_COLUMN_FAMILY);
+        aclColumnFamily = StorageClientUtils.getSetting(properties.get(ACL_COLUMN_FAMILY), "ac");
+        keySpace = StorageClientUtils.getSetting(properties.get(KEYSPACE),"n");
+        authorizableColumnFamily = StorageClientUtils.getSetting(properties.get(AUTHORIZABLE_COLUMN_FAMILY),"au");
+        contentColumnFamily = StorageClientUtils.getSetting(properties.get(CONTENT_COLUMN_FAMILY),"cn");
     }
 
     public String getAclColumnFamily() {
@@ -65,5 +84,8 @@ public class ConfigurationImpl implements Configuration {
 
     public String getContentColumnFamily() {
         return contentColumnFamily;
+    }
+    public String[] getPropertiesIndexColumnName() {
+        return PROPERTIES_INDEX_COLUMN_NAME;
     }
 }

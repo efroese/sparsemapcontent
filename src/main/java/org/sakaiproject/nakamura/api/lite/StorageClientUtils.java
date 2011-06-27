@@ -308,7 +308,7 @@ public class StorageClientUtils {
      * @return
      */
     @SuppressWarnings("unchecked")
-    public static <K, V> Map<K, V> getFilterMap(Map<K, V> source, Map<K, V> modified, Set<K> include, Set<K> exclude) {
+    public static <K, V> Map<K, V> getFilterMap(Map<K, V> source, Map<K, V> modified, Set<K> include, Set<K> exclude, boolean includingRemoveProperties ) {
        if ((modified == null || modified.size() == 0) && (include == null) && ( exclude == null || exclude.size() == 0)) {
            if ( source instanceof ImmutableMap ) {
                return source;
@@ -325,7 +325,9 @@ public class StorageClientUtils {
                         V o = modified.get(k);
                         if (o instanceof Map) {
                             filteredMap.put(k,
-                                    (V) getFilterMap((Map<K, V>) o, null, null, exclude));
+                                    (V) getFilterMap((Map<K, V>) o, null, null, exclude, includingRemoveProperties));
+                        } else if ( includingRemoveProperties ) {
+                            filteredMap.put(k, o);
                         } else if ( !(o instanceof RemoveProperty) ) {
                             filteredMap.put(k, o);
                         }
@@ -333,7 +335,7 @@ public class StorageClientUtils {
                         Object o = e.getValue();
                         if (o instanceof Map) {
                             filteredMap.put(k,
-                                    (V) getFilterMap((Map<K, V>) e.getValue(), null, null, exclude));
+                                    (V) getFilterMap((Map<K, V>) e.getValue(), null, null, exclude, includingRemoveProperties));
                         } else {
                             filteredMap.put(k, e.getValue());
                         }
@@ -467,6 +469,21 @@ public class StorageClientUtils {
     @SuppressWarnings("unchecked")
     public static <T> T getSetting(Object setting, T defaultValue) {
         if (setting != null) {
+            if (defaultValue.getClass().isAssignableFrom(setting.getClass())) {
+                return (T) setting;
+            }
+            // handle conversions
+            if ( defaultValue instanceof Long ) {
+                return (T) new Long(String.valueOf(setting));
+            } else if ( defaultValue instanceof Integer ) {
+                return (T) new Integer(String.valueOf(setting));
+            } else if (defaultValue instanceof Boolean ) {
+                return (T) new Boolean(String.valueOf(setting));
+            } else if ( defaultValue instanceof Double ) {
+                return (T) new Double(String.valueOf(setting));
+            } else if ( defaultValue instanceof String[] ) {
+                return (T) StringUtils.split(String.valueOf(setting), ',');
+            }
             return (T) setting;
         }
         return defaultValue;
@@ -634,6 +651,10 @@ public class StorageClientUtils {
             }
         }
         contentManager.delete(path);
+    }
+
+    public static String getInternalUuid() {
+        return getUuid()+"+"; // URL safe base 64 does not use + chars
     }
 
 }

@@ -15,23 +15,25 @@
  * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-package org.sakaiproject.nakamura.lite.jdbc.derby;
+package org.sakaiproject.nakamura.lite.jdbc.postgresql;
 
 import com.google.common.collect.ImmutableMap;
 
 import org.sakaiproject.nakamura.lite.storage.jdbc.JDBCStorageClientPool;
 
-public class DerbySetup {
+public class PostgreSQLSetup {
 
     private static JDBCStorageClientPool clientPool = createClientPool();
 
-    private synchronized static JDBCStorageClientPool createClientPool() {
+    public synchronized static JDBCStorageClientPool createClientPool() {
         try {
             JDBCStorageClientPool connectionPool = new JDBCStorageClientPool();
-            connectionPool.activate(ImmutableMap.of(JDBCStorageClientPool.CONNECTION_URL,
-                    (Object) "jdbc:derby:memory:MyDB;create=true",
-                    JDBCStorageClientPool.JDBC_DRIVER, "org.apache.derby.jdbc.EmbeddedDriver",
-                    "store-base-dir", "target/store"));
+            connectionPool
+                    .activate(ImmutableMap
+                            .of(JDBCStorageClientPool.CONNECTION_URL,
+                                    (Object) "jdbc:postgresql://localhost/nak",
+                                    JDBCStorageClientPool.JDBC_DRIVER, "org.postgresql.Driver",
+                                    "username", "nakamura", "password", "nakamura","store-base-dir", "target/store"));
             return connectionPool;
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e.getMessage(), e);
@@ -41,5 +43,4 @@ public class DerbySetup {
     public static JDBCStorageClientPool getClientPool() {
         return clientPool;
     }
-
 }
