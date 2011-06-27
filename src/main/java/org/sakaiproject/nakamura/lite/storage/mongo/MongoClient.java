@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.bson.BSONObject;
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
@@ -58,7 +57,6 @@ public class MongoClient implements StorageClient, RowHasher {
 	 * (non-Javadoc)
 	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#get(java.lang.String, java.lang.String, java.lang.String)
 	 */
-	@SuppressWarnings("unchecked")
 	public Map<String, Object> get(String keySpace, String columnFamily,
 			String key) throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
@@ -69,7 +67,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		DBCursor cursor = collection.find(query);
 		Map<String,Object> result = null;
 		if (cursor.size() == 1){
-			result = (Map<String,Object>)cursor.next();
+			result = MongoUtils.convertDBObjectToMap(cursor.next());
 		}
 		if (result == null){
 			result = new HashMap<String, Object>();
@@ -159,7 +157,6 @@ public class MongoClient implements StorageClient, RowHasher {
 	 * (non-Javadoc)
 	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#find(java.lang.String, java.lang.String, java.util.Map)
 	 */
-	@SuppressWarnings("unchecked")
 	public DisposableIterator<Map<String, Object>> find(String keySpace,
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
@@ -180,7 +177,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 
 			public Map<String, Object> next() {
-				return (Map<String, Object>) itr.next();
+				return MongoUtils.convertDBObjectToMap((DBObject)itr.next());
 			}
 
 			public void remove() {
@@ -210,9 +207,9 @@ public class MongoClient implements StorageClient, RowHasher {
 			String keySpace, String columnFamily, String key)
 			throws StorageClientException {
 		// this will load all child object directly.
-        String hash = rowHash(keySpace, columnFamily, key);
-        log.debug("Finding {}:{}:{} as {} ", new Object[]{keySpace,columnFamily, key, hash});
-        return find(keySpace, columnFamily, ImmutableMap.of(InternalContent.PARENT_HASH_FIELD, (Object)hash));
+		String hash = rowHash(keySpace, columnFamily, key);
+		log.debug("Finding {}:{}:{} as {} ", new Object[]{keySpace,columnFamily, key, hash});
+		return find(keySpace, columnFamily, ImmutableMap.of(InternalContent.PARENT_HASH_FIELD, (Object)hash));
 	}
 
 	/*
