@@ -5,8 +5,10 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
@@ -140,11 +142,33 @@ public class MongoClient implements StorageClient, RowHasher {
 	 * (non-Javadoc)
 	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#find(java.lang.String, java.lang.String, java.util.Map)
 	 */
+	@SuppressWarnings("unchecked")
 	public DisposableIterator<Map<String, Object>> find(String keySpace,
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject(properties);
+
+		// Go through the properties of the query
+		for (String key: properties.keySet()){
+
+			// There's a difference in the way sparse sends the multi-valued
+			// queries and the way that MongoDB expects them.
+			if (key.startsWith("orset")){
+				// orset = { "orset0" : { "orField" : [ "orVal0", "orVal1" ] } }
+				Map<String,Object> orset = (Map<String, Object>) properties.get(key);
+				String orField = orset.keySet().iterator().next();
+				List<String> orSetValues = (List<String>)orset.get(orField);
+				// mongoOrSet = { "$or" : [ BasicDBObject("orField", "orVal0"), BasicDBObject("orField", "orVal1") ] } 
+				ArrayList<BasicDBObject> mongoOrSet = new ArrayList<BasicDBObject>();
+				for(String orVal: orSetValues){
+					mongoOrSet.add(new BasicDBObject(orField, orVal));
+				}
+				// Remove the original query and add a Mongo OR query.
+				query.remove(key);
+				query.put(Operators.OR, mongoOrSet);
+			}
+		}
 
 		DBCursor cursor = collection.find(query);
 		if (properties.containsKey("_sort")){
