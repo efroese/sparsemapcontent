@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
@@ -17,14 +19,18 @@ public class MongoUtils {
 	 * @return the properties ready for Mongo
 	 */
 	public static Map<String, Object> cleanPropertiesForInsert(Map<String, Object> props) {
+		Builder<String,Object> builder = ImmutableMap.builder();
 		for(String key : props.keySet()){
 			Object val = props.get(key);
 			if (val instanceof RemoveProperty){
-				props.remove(key);
-				props.put(Operators.UNSET, new BasicDBObject(key, 1));
+				// builder.put(Operators.UNSET, new BasicDBObject(key, 1));
+				builder.put(key, Operators.UNSET);
+			}
+			else {
+				builder.put(key, val);
 			}
 		}
-		return props;
+		return builder.build();
 	}
 
 	/**
