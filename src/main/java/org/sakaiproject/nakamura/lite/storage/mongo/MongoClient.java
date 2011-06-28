@@ -151,25 +151,41 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		// Go through the properties of the query
 		for (String key: properties.keySet()){
+			Object val = properties.get(key);
 
-			// There's a difference in the way sparse sends the multi-valued
-			// queries and the way that MongoDB expects them.
-			if (key.startsWith("orset")){
-				// orset = { "orset0" : { "orField" : [ "orVal0", "orVal1" ] } }
-				Map<String,Object> orset = (Map<String, Object>) properties.get(key);
-				String orField = orset.keySet().iterator().next();
-				List<String> orSetValues = (List<String>)orset.get(orField);
-				// mongoOrSet = { "$or" : [ BasicDBObject("orField", "orVal0"), BasicDBObject("orField", "orVal1") ] } 
-				ArrayList<BasicDBObject> mongoOrSet = new ArrayList<BasicDBObject>();
-				for(String orVal: orSetValues){
-					mongoOrSet.add(new BasicDBObject(orField, orVal));
+			if (val instanceof Map){
+				// This is how it comes from sparse
+				// properties = { "orset0" : { "fieldName" : [ "searchVal0", "searchVal1" ] } }
+				Map<String,Object> multiValQueryMap = (Map<String, Object>) val;
+				String field = multiValQueryMap.keySet().iterator().next();
+				List<String> searchValues = (List<String>)multiValQueryMap.get(field);
+
+				// This is what mongo expects
+				// mongoQuery = { "$or" : [ BasicDBObject("field", "val0"), 
+				//                             BasicDBObject("field", "val1") ] } 
+				ArrayList<BasicDBObject> mongoQuery = new ArrayList<BasicDBObject>();
+				for(String searchVal: searchValues){
+					mongoQuery.add(new BasicDBObject(field, searchVal));
 				}
-				// Remove the original query and add a Mongo OR query.
-				query.remove(key);
-				query.put(Operators.OR, mongoOrSet);
+
+				if (key.startsWith("orset")){
+					// Remove the original query and add a Mongo OR query.
+					query.remove(key);
+					query.put(Operators.OR, mongoQuery);
+				}
+			}
+			else if (val instanceof List){
+				// What mongo expects
+				// { "fieldName" : { "$all" : [ "valueX", "valueY" ] } }
+				List<String> valList = (List<String>)val;
+				BasicDBObject mongoSet = new BasicDBObject();
+				mongoSet.put(Operators.ALL, valList);
+				// overwrite the original value of key
+				query.put(key, mongoSet);
 			}
 		}
 
+		// See if we need to sort
 		DBCursor cursor = collection.find(query);
 		if (properties.containsKey("_sort")){
 			query.remove("_sort");
