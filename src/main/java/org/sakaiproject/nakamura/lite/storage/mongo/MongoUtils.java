@@ -8,7 +8,6 @@ import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
 import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 
 public class MongoUtils {
