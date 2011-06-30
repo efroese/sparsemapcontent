@@ -26,7 +26,7 @@ public class MongoUtils {
 				// builder.put(Operators.UNSET, new BasicDBObject(key, 1));
 				builder.put(key, Operators.UNSET);
 			}
-			else {
+			else if (val != null){
 				builder.put(key, val);
 			}
 		}
