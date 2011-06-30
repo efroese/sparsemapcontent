@@ -17,13 +17,15 @@
  */
 package org.sakaiproject.nakamura.lite.mongo;
 
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.lite.content.AbstractContentManagerFinderTest;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
 public class ContentManagerFinderImplMan extends AbstractContentManagerFinderTest {
 
     @Override
-    protected StorageClientPool getClientPool() throws ClassNotFoundException {
+    protected StorageClientPool getClientPool(Configuration configuration)
+	throws ClassNotFoundException {
         return MongoSetup.getClientPool();
     }
 
