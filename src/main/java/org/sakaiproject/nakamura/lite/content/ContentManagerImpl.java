@@ -149,6 +149,8 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                                                                         UUID_FIELD,
                                                                         PATH_FIELD);
 
+	private static final Set<String> VERSIONHISTORY_PRIVATE_PROPERTIES = ImmutableSet.of("id", "_id");
+
 
     /**
      * Storage Client
@@ -719,8 +721,8 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 String versionHistoryId = (String)content
                         .get(VERSION_HISTORY_ID_FIELD);
                 if (versionHistoryId != null) {
-                    final Map<String, Object> versionHistory = getCached(keySpace,
-                            contentColumnFamily, versionHistoryId);
+                    final Map<String, Object> versionHistory =
+                        StorageClientUtils.getFilterMap(getCached(keySpace,contentColumnFamily, versionHistoryId), null, null, VERSIONHISTORY_PRIVATE_PROPERTIES, true);
                     LOGGER.debug("Loaded Version History  {} {} ", versionHistoryId, versionHistory);
                     return Lists.sortedCopy(versionHistory.keySet(), new Comparator<String>() {
                         public int compare(String o1, String o2) {
