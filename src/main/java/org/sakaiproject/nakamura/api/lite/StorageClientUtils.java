@@ -225,6 +225,15 @@ public class StorageClientUtils {
     // TODO: Unit test
     public static String insecureHash(String naked) {
         try {
+            return insecureHash(naked.getBytes(UTF8));
+        } catch (UnsupportedEncodingException e3) {
+            LOGGER.error("no UTF-8 Envoding, get a real JVM, nothing will work here. NPE to come");
+            return null;
+        }
+    }
+
+    public static String insecureHash(byte[] b) {
+        try {
             MessageDigest md;
             try {
                 md = MessageDigest.getInstance("SHA-1");
@@ -234,10 +243,10 @@ public class StorageClientUtils {
                 } catch (NoSuchAlgorithmException e2) {
                     LOGGER.error("You have no Message Digest Algorightms intalled in this JVM, secure Hashes are not availalbe, encoding bytes :"
                             + e2.getMessage());
-                    return encode(StringUtils.leftPad(naked, 10, '_').getBytes(UTF8));
+                    return encode(StringUtils.leftPad((new String(b,"UTF-8")), 10, '_').getBytes(UTF8));
                 }
             }
-            byte[] bytes = md.digest(naked.getBytes(UTF8));
+            byte[] bytes = md.digest(b);
             return encode(bytes);
         } catch (UnsupportedEncodingException e3) {
             LOGGER.error("no UTF-8 Envoding, get a real JVM, nothing will work here. NPE to come");
@@ -310,7 +319,7 @@ public class StorageClientUtils {
      * @return a map with the modifications applied and filtered by the includes and excludes
      */
     @SuppressWarnings("unchecked")
-    public static <K, V> Map<K, V> getFilterMap(Map<K, V> source, Map<K, V> modified, Set<K> include, Set<K> exclude) {
+    public static <K, V> Map<K, V> getFilterMap(Map<K, V> source, Map<K, V> modified, Set<K> include, Set<K> exclude, boolean includingRemoveProperties ) {
        if ((modified == null || modified.size() == 0) && (include == null) && ( exclude == null || exclude.size() == 0)) {
            if ( source instanceof ImmutableMap ) {
                return source;
@@ -328,7 +337,9 @@ public class StorageClientUtils {
                         V o = modified.get(k);
                         if (o instanceof Map) {
                             filteredMap.put(k,
-                                    (V) getFilterMap((Map<K, V>) o, null, null, exclude));
+                                    (V) getFilterMap((Map<K, V>) o, null, null, exclude, includingRemoveProperties));
+                        } else if ( includingRemoveProperties ) {
+                            filteredMap.put(k, o);
                         } else if ( !(o instanceof RemoveProperty) ) {
                             filteredMap.put(k, o);
                         }
@@ -336,7 +347,7 @@ public class StorageClientUtils {
                         Object o = e.getValue();
                         if (o instanceof Map) {
                             filteredMap.put(k,
-                                    (V) getFilterMap((Map<K, V>) e.getValue(), null, null, exclude));
+                                    (V) getFilterMap((Map<K, V>) e.getValue(), null, null, exclude, includingRemoveProperties));
                         } else {
                             filteredMap.put(k, e.getValue());
                         }
@@ -470,6 +481,21 @@ public class StorageClientUtils {
     @SuppressWarnings("unchecked")
     public static <T> T getSetting(Object setting, T defaultValue) {
         if (setting != null) {
+            if (defaultValue.getClass().isAssignableFrom(setting.getClass())) {
+                return (T) setting;
+            }
+            // handle conversions
+            if ( defaultValue instanceof Long ) {
+                return (T) new Long(String.valueOf(setting));
+            } else if ( defaultValue instanceof Integer ) {
+                return (T) new Integer(String.valueOf(setting));
+            } else if (defaultValue instanceof Boolean ) {
+                return (T) new Boolean(String.valueOf(setting));
+            } else if ( defaultValue instanceof Double ) {
+                return (T) new Double(String.valueOf(setting));
+            } else if ( defaultValue instanceof String[] ) {
+                return (T) StringUtils.split(String.valueOf(setting), ',');
+            }
             return (T) setting;
         }
         return defaultValue;
@@ -645,6 +671,10 @@ public class StorageClientUtils {
             }
         }
         contentManager.delete(path);
+    }
+
+    public static String getInternalUuid() {
+        return getUuid()+"+"; // URL safe base 64 does not use + chars
     }
 
 }

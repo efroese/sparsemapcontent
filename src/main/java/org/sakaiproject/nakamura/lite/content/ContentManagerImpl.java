@@ -144,8 +144,10 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
     private static final Logger LOGGER = LoggerFactory.getLogger(ContentManagerImpl.class);
 
 
-    private static final Set<String> DEEP_COPY_FILTER = ImmutableSet.of(LASTMODIFIED_FIELD,
-            LASTMODIFIED_BY_FIELD, UUID_FIELD, PATH_FIELD);
+    private static final Set<String> PROTECTED_FIELDS = ImmutableSet.of(LASTMODIFIED_FIELD,
+                                                                        LASTMODIFIED_BY_FIELD,
+                                                                        UUID_FIELD,
+                                                                        PATH_FIELD);
 
 
     /**
@@ -253,7 +255,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         };
     }
 
-    public Iterator<String> listChildPaths(String path) throws StorageClientException {
+    public Iterator<String> listChildPaths(final String path) throws StorageClientException {
         final Iterator<Map<String, Object>> childContent = client.listChildren(keySpace,
                 contentColumnFamily, path);
         return new PreemptiveIterator<String>() {
@@ -265,7 +267,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 while(childContent.hasNext()) {
                     try {
                         Map<String, Object> structureMap = childContent.next();
-                        LOGGER.debug("Loaded Next as {} ", structureMap);
+                        LOGGER.debug("Loaded Next child of {} as {} ", path, structureMap);
                         if ( structureMap != null && structureMap.size() > 0 ) {
                             String testChildPath = (String) structureMap.get(PATH_FIELD);
                                 accessControlManager.check(Security.ZONE_CONTENT, testChildPath, Permissions.CAN_READ);
@@ -273,7 +275,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                                 // this is not that efficient since it requires the map is
                                 // loaded, at the moment I dont have a way round this with the
                                 // underlying index strucutre.
-                                LOGGER.debug("Got Next Child as {} ", childPath);
+                                LOGGER.debug("Got Next Child of {} as {} ", path, childPath);
                                 return true;
                         }
                     } catch (AccessDeniedException e) {
@@ -312,7 +314,10 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 content = existingContent;
             }
         }
+
         Map<String, Object> originalProperties = ImmutableMap.of();
+        boolean isAdmin = User.ADMIN_USER.equals(accessControlManager.getCurrentUserId());
+
         if (content.isNew()) {
             // create the parents if necessary
             if (!StorageClientUtils.isRoot(path)) {
@@ -323,8 +328,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 }
             }
             toSave =  Maps.newHashMap(content.getPropertiesForUpdate());
-            boolean isAdmin = User.ADMIN_USER.equals(accessControlManager.getCurrentUserId());
-            id = StorageClientUtils.getUuid();
+            id = StorageClientUtils.getInternalUuid();
             // if the user is admin we allow overwriting of protected fields. This should allow content migration.
             setField(isAdmin, toSave, UUID_FIELD, id);
             toSave.put(PATH_FIELD, path);
@@ -337,6 +341,12 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         } else if (content.isUpdated()) {
             originalProperties = content.getOriginalProperties();
             toSave =  Maps.newHashMap(content.getPropertiesForUpdate());
+
+            for (String field : PROTECTED_FIELDS) {
+                LOGGER.debug ("Resetting value for {} to {}", field, originalProperties.get(field));
+                setField(isAdmin, toSave, field, originalProperties.get(field));
+            }
+
             id = (String)toSave.get(UUID_FIELD);
             toSave.put(LASTMODIFIED_FIELD, System.currentTimeMillis());
             toSave.put(LASTMODIFIED_BY_FIELD,
@@ -382,15 +392,16 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         if ( structure != null && structure.size() > 0 ) {
             String uuid = (String)structure.get(STRUCTURE_UUID_FIELD);
             Map<String, Object> content = getCached(keySpace, contentColumnFamily, uuid);
+            Map<String, Object> contentBeforeDelete = ImmutableMap.copyOf(content);
             String resourceType = (String) content.get("sling:resourceType");
             removeFromCache(keySpace, contentColumnFamily, path);
             client.remove(keySpace, contentColumnFamily, path);
             putCached(keySpace, contentColumnFamily, uuid,
                     ImmutableMap.of(DELETED_FIELD, (Object) TRUE), false);
             if (resourceType != null) {
-              eventListener.onDelete(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), null, "resourceType:" + resourceType);
+              eventListener.onDelete(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), contentBeforeDelete, "resourceType:" + resourceType);
             } else {
-              eventListener.onDelete(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), null);
+              eventListener.onDelete(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), contentBeforeDelete);
             }
         }
     }
@@ -412,7 +423,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         if (content.containsKey(blockIdField)) {
             isnew = false;      
         }
-        String contentBlockId = StorageClientUtils.getUuid();
+        String contentBlockId = StorageClientUtils.getInternalUuid();
         
         Map<String, Object> metadata = client.streamBodyIn(keySpace, contentColumnFamily,
                 contentId, contentBlockId, streamId, content, in);
@@ -427,7 +438,11 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                     accessControlManager.getCurrentUserId());
         }
         putCached(keySpace, contentColumnFamily, contentId, metadata, isnew);
-        long length = (Long) metadata.get(LENGTH_FIELD);
+        long length = 0;
+        String lengthFieldName = StorageClientUtils.getAltField(LENGTH_FIELD, streamId);
+        if (metadata.containsKey(lengthFieldName)) {
+          length = (Long) metadata.get(lengthFieldName);
+        }
         eventListener.onUpdate(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), false, null, "stream", streamId);
         return length;
 
@@ -468,7 +483,11 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
     }
 
     // TODO: Unit test
-    public void copy(String from, String to, boolean deep) throws StorageClientException,
+    /**
+     * {@inheritDoc}
+     * @see org.sakaiproject.nakamura.api.lite.content.ContentManager#copy(java.lang.String, java.lang.String, boolean)
+     */
+    public void copy(String from, String to, boolean withStreams) throws StorageClientException,
             AccessDeniedException, IOException {
         checkOpen();
         // To Copy, get the to object out and copy everything over.
@@ -478,13 +497,16 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         }
         Content t = get(to);
         if (t != null) {
-            delete(to);
+           LOGGER.info("Deleting {} ",to);
+           delete(to);
         }
         Set<String> streams = Sets.newHashSet();
         Map<String, Object> copyProperties = Maps.newHashMap();
-        if (deep) {
+        if (withStreams) {
             for (Entry<String, Object> p : f.getProperties().entrySet()) {
-                if (!DEEP_COPY_FILTER.contains(p.getKey())) {
+                // Protected fields (such as ID and path) will differ between
+                // the source and destination, so don't copy them.
+                if (!PROTECTED_FIELDS.contains(p.getKey())) {
                     if (p.getKey().startsWith(BLOCKID_FIELD)) {
                         streams.add(p.getKey());
                     } else {
@@ -497,9 +519,10 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         }
         copyProperties.put(COPIED_FROM_PATH_FIELD, from);
         copyProperties.put(COPIED_FROM_ID_FIELD, f.getProperty(UUID_FIELD));
-        copyProperties.put(COPIED_DEEP_FIELD, deep);
+        copyProperties.put(COPIED_DEEP_FIELD, withStreams);
         t = new Content(to, copyProperties);
         update(t);
+        LOGGER.debug("Copy Updated {} {} ",to,t);
 
         for (String stream : streams) {
             String streamId = null;
@@ -643,7 +666,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         String versionHistoryId = (String)saveVersion.get(VERSION_HISTORY_ID_FIELD);
 
         if (versionHistoryId == null) {
-            versionHistoryId = StorageClientUtils.getUuid();
+            versionHistoryId = StorageClientUtils.getInternalUuid();
             LOGGER.debug("Created new Version History UUID as {} for Object {} ",versionHistoryId, saveVersionId);
             saveVersion.put(VERSION_HISTORY_ID_FIELD, versionHistoryId);
         } else {
@@ -652,7 +675,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         }
 
         Map<String, Object> newVersion = Maps.newHashMap(saveVersion);
-        String newVersionId = StorageClientUtils.getUuid();
+        String newVersionId = StorageClientUtils.getInternalUuid();
 
 
         String saveBlockId = (String)saveVersion.get(BLOCKID_FIELD);
