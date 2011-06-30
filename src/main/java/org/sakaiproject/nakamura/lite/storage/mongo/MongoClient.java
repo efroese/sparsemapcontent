@@ -85,21 +85,33 @@ public class MongoClient implements StorageClient, RowHasher {
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
-		// The document we're going to put in mongo
-		BasicDBObject insert = new BasicDBObject(MongoUtils.cleanPropertiesForInsert(values));
+		// document to update.
+		DBObject query = new BasicDBObject("id", key);
+		DBCursor cursor = collection.find(query);
+
+		// If the document exists lets merge this document into it and save it.
+		// Why not?
+		DBObject updated = new BasicDBObject();
+		if (cursor.size() == 1){
+			updated.putAll(MongoUtils.convertDBObjectToMap(cursor.next()));
+		}
+
+		// The values we're going to put in mongo
+		DBObject insert = new BasicDBObject(MongoUtils.cleanPropertiesForInsert(values));
 		insert.put("id", key);
 
+		// Set the parent path hash if this is a piece of content
 		if (insert.keySet().contains(InternalContent.PATH_FIELD)) {
-			// Set the parent path hash for this content document
 			if ( !StorageClientUtils.isRoot(key)) {
 				insert.put(InternalContent.PARENT_HASH_FIELD, rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
 			}
 		}
 
-		// document to look for.
-		BasicDBObject query = new BasicDBObject("id", key);
+		// Merge the new values into the stored values
+		updated.putAll(insert);
+
 		// Update or insert a single document.
-		collection.update(query, insert, true, false);
+		collection.update(query, updated, true, false);
 		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
 	}
 
