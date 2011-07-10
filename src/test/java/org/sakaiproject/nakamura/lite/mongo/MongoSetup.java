@@ -34,7 +34,7 @@ public class MongoSetup {
             connectionPool
                     .activate(ImmutableMap
                             .of(MongoClientPool.PROP_MONGO_URI, (Object) "mongodb://127.0.0.1",
-                            	MongoClientPool.PROP_MONGO_DB, (Object) "nakamura"));
+                            	MongoClientPool.PROP_MONGO_DB, (Object) "smc_unittests"));
             return connectionPool;
         } catch (MongoException e) {
         	throw new RuntimeException(e.getMessage(), e);
