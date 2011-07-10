@@ -50,7 +50,7 @@ public class InternalContent {
     /**
      * The ID of a content item
      */
-    public static final String UUID_FIELD = Repository.SYSTEM_PROP_PREFIX + "id";
+    public static final String UUID_FIELD = Repository.SYSTEM_PROP_PREFIX + "sparseId";
     /**
      * The path of the content item (used in structure row)
      */
@@ -318,11 +318,14 @@ public class InternalContent {
      *            the key for the property
      * @param value
      *            the value for the property in storage format created with
-     *            StorageContentUtils.toStore()
+     *            StorageContentUtils.toStore(). Must not be null.
      */
     public void setProperty(String key, Object value) {
         if ( readOnly) {
             return;
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("value must not be null");
         }
         Object o = content.get(key);
         if (!value.equals(o) ) {
