@@ -5,8 +5,6 @@ import java.util.Map;
 
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 import com.mongodb.BasicDBList;
 import com.mongodb.DBObject;
 
@@ -18,18 +16,18 @@ public class MongoUtils {
 	 * @return the properties ready for Mongo
 	 */
 	public static Map<String, Object> cleanPropertiesForInsert(Map<String, Object> props) {
-		Builder<String,Object> builder = ImmutableMap.builder();
+		Map<String,Object> cleaned = new HashMap<String, Object>();
 		for(String key : props.keySet()){
 			Object val = props.get(key);
+			// Replace the sparse RemoveProperty with the Mongo $unset.
 			if (val instanceof RemoveProperty){
-				// builder.put(Operators.UNSET, new BasicDBObject(key, 1));
-				builder.put(key, Operators.UNSET);
+				cleaned.put(key, Operators.UNSET);
 			}
 			else if (val != null){
-				builder.put(key, val);
+				cleaned.put(key, val);
 			}
 		}
-		return builder.build();
+		return cleaned;
 	}
 
 	/**
