@@ -60,6 +60,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	 */
 	public Map<String, Object> get(String keySpace, String columnFamily,
 			String key) throws StorageClientException {
+		log.info("get {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
 		// Pretty straightforward. Just query by the id.
@@ -84,7 +85,6 @@ public class MongoClient implements StorageClient, RowHasher {
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
 		DBCollection collection = mongodb.getCollection(columnFamily);
-
 		// document to update.
 		DBObject query = new BasicDBObject("id", key);
 		DBCursor cursor = collection.find(query);
@@ -103,16 +103,16 @@ public class MongoClient implements StorageClient, RowHasher {
 		// Set the parent path hash if this is a piece of content
 		if (insert.keySet().contains(InternalContent.PATH_FIELD)) {
 			if ( !StorageClientUtils.isRoot(key)) {
-				insert.put(InternalContent.PARENT_HASH_FIELD, rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
+				insert.put(InternalContent.PARENT_HASH_FIELD,
+						rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
 			}
 		}
-
 		// Merge the new values into the stored values
 		updated.putAll(insert);
 
 		// Update or insert a single document.
 		collection.update(query, updated, true, false);
-		log.info("Inserting into {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
+		log.info("insert {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
 	}
 
 	/*
@@ -121,6 +121,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	 */
 	public void remove(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
+		log.info("remove {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject();
 		query.put("id", key);
@@ -274,6 +275,8 @@ public class MongoClient implements StorageClient, RowHasher {
 		} catch (UnsupportedEncodingException e) {
 			ridkey = keystring.getBytes();
 		}
-		return StorageClientUtils.encode(hasher.digest(ridkey));
+		String hash = StorageClientUtils.encode(hasher.digest(ridkey)); 
+		log.info("{}:{}:{} => {}", new Object[]{keySpace, columnFamily, key, hash});
+		return hash;
 	}
 }
