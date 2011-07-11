@@ -84,35 +84,26 @@ public class MongoClient implements StorageClient, RowHasher {
 	public void insert(String keySpace, String columnFamily, String key,
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
-		DBCollection collection = mongodb.getCollection(columnFamily);
-		// document to update.
-		DBObject query = new BasicDBObject("id", key);
-		DBCursor cursor = collection.find(query);
-
-		// If the document exists lets merge this document into it and save it.
-		// Why not?
-		DBObject updated = new BasicDBObject();
-		if (cursor.size() == 1){
-			updated.putAll(MongoUtils.convertDBObjectToMap(cursor.next()));
-		}
-
-		// The values we're going to put in mongo
-		DBObject insert = new BasicDBObject(MongoUtils.cleanPropertiesForInsert(values));
-		insert.put("id", key);
-
+		HashMap<String,Object> mutableValues = new HashMap<String,Object>(values);
 		// Set the parent path hash if this is a piece of content
-		if (insert.keySet().contains(InternalContent.PATH_FIELD)) {
+		if (values.keySet().contains(InternalContent.PATH_FIELD)) {
 			if ( !StorageClientUtils.isRoot(key)) {
-				insert.put(InternalContent.PARENT_HASH_FIELD,
+				mutableValues.put(InternalContent.PARENT_HASH_FIELD,
 						rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
 			}
 		}
-		// Merge the new values into the stored values
-		updated.putAll(insert);
+
+		DBCollection collection = mongodb.getCollection(columnFamily);
+
+		// document to update.
+		DBObject query = new BasicDBObject("id", key);
+
+		// The values we're going to put in mongo
+		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);
 
 		// Update or insert a single document.
-		collection.update(query, updated, true, false);
-		log.info("insert {}:{}:{}", new Object[] {keySpace, columnFamily, key, values.toString()});
+		collection.update(query, insert, true, false);
+		log.info("insert {}:{}:{} => {}", new Object[] {keySpace, columnFamily, key, insert.toString()});
 	}
 
 	/*
