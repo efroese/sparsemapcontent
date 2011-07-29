@@ -87,7 +87,8 @@
           <instructions>
             <Bundle-Category>sakai-nakamura</Bundle-Category>
             <Export-Package>
-              org.sakaiproject.nakamura.api.lite.*
+              org.sakaiproject.nakamura.api.lite.*,
+              org.sakaiproject.nakamura.lite.storage
 			</Export-Package>
 			<DynamicImport-Package>*</DynamicImport-Package>
 			<Import-Package>
