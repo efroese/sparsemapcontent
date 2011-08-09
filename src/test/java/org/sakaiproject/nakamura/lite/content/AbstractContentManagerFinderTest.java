@@ -1204,4 +1204,29 @@ public abstract class AbstractContentManagerFinderTest {
     Assert.assertFalse(findOfOldval.iterator().hasNext());
   }
 
+  @Test
+  public void testCountTest() throws StorageClientException, AccessDeniedException {
+      AuthenticatorImpl AuthenticatorImpl = new AuthenticatorImpl(client, configuration);
+      User currentUser = AuthenticatorImpl.authenticate("admin", "admin");
+
+      AccessControlManagerImpl accessControlManager = new AccessControlManagerImpl(client,
+              currentUser, configuration, null, new LoggingStorageListener(),
+              principalValidatorResolver);
+
+      ContentManagerImpl contentManager = new ContentManagerImpl(client, accessControlManager,
+              configuration, null, new LoggingStorageListener());
+      contentManager.update(new Content("/simpleFind", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue1")));
+      contentManager.update(new Content("/simpleFind/item2", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue1")));
+      contentManager.update(new Content("/simpleFind/test", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue3")));
+      contentManager.update(new Content("/simpleFind/test/ing", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue4")));
+
+      Assert.assertEquals(1, contentManager.count(ImmutableMap.of("sakai:marker", (Object) "testSimpleFindvalue4")));
+      Assert.assertEquals(2, contentManager.count(ImmutableMap.of("sakai:marker", (Object) "testSimpleFindvalue1")));
+
+  }
+
 }

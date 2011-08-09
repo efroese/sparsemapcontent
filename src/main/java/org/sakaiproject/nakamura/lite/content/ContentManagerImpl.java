@@ -39,10 +39,10 @@ import static org.sakaiproject.nakamura.lite.content.InternalContent.PREVIOUS_VE
 import static org.sakaiproject.nakamura.lite.content.InternalContent.READONLY_FIELD;
 import static org.sakaiproject.nakamura.lite.content.InternalContent.STRUCTURE_UUID_FIELD;
 import static org.sakaiproject.nakamura.lite.content.InternalContent.TRUE;
-import static org.sakaiproject.nakamura.lite.content.InternalContent.UUID_FIELD;
 import static org.sakaiproject.nakamura.lite.content.InternalContent.VERSION_HISTORY_ID_FIELD;
 import static org.sakaiproject.nakamura.lite.content.InternalContent.VERSION_NUMBER_FIELD;
 
+import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -53,6 +53,7 @@ import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.api.lite.StorageConstants;
 import org.sakaiproject.nakamura.api.lite.StoreListener;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessControlManager;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
@@ -146,7 +147,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
     private static final Set<String> PROTECTED_FIELDS = ImmutableSet.of(LASTMODIFIED_FIELD,
                                                                         LASTMODIFIED_BY_FIELD,
-                                                                        UUID_FIELD,
+                                                                        Content.getUuidFeld(),
                                                                         PATH_FIELD);
 
 
@@ -170,6 +171,11 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
     private boolean closed;
 
     private StoreListener eventListener;
+ 
+    /**
+     * Fields are not protected when the content manager is in maintanence mode. Only an admin session can switch to maintanence mode.
+     */
+    private boolean maintanenceMode = false;
 
 
     private PathPrincipalTokenResolver pathPrincipalResolver;
@@ -186,6 +192,12 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         String usersTokenPath = StorageClientUtils.newPath(userId, "private/tokens");
         this.pathPrincipalResolver = new PathPrincipalTokenResolver(usersTokenPath, this);
         this.accessControlManager = new AccessControlManagerTokenWrapper(accessControlManager, pathPrincipalResolver);
+    }
+  
+    public void setMaintanenceMode(boolean maintanenceMode) {
+        if ( User.ADMIN_USER.equals(accessControlManager.getCurrentUserId()) ) {
+           this.maintanenceMode = maintanenceMode;
+        }
     }
 
 
@@ -322,7 +334,6 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         }
 
         Map<String, Object> originalProperties = ImmutableMap.of();
-        boolean isAdmin = User.ADMIN_USER.equals(accessControlManager.getCurrentUserId());
 
         if (content.isNew()) {
             // create the parents if necessary
@@ -336,12 +347,12 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
             toSave =  Maps.newHashMap(content.getPropertiesForUpdate());
             id = StorageClientUtils.getInternalUuid();
             // if the user is admin we allow overwriting of protected fields. This should allow content migration.
-            setField(isAdmin, toSave, UUID_FIELD, id);
+            setField(toSave, Content.getUuidFeld(), id);
             toSave.put(PATH_FIELD, path);
-            setField(isAdmin, toSave, CREATED_FIELD, System.currentTimeMillis());
-            setField(isAdmin, toSave, CREATED_BY_FIELD, accessControlManager.getCurrentUserId());
-            setField(isAdmin, toSave, LASTMODIFIED_FIELD, System.currentTimeMillis());
-            setField(isAdmin, toSave, LASTMODIFIED_BY_FIELD,
+            setField(toSave, CREATED_FIELD, System.currentTimeMillis());
+            setField(toSave, CREATED_BY_FIELD, accessControlManager.getCurrentUserId());
+            setField(toSave, LASTMODIFIED_FIELD, System.currentTimeMillis());
+            setField(toSave, LASTMODIFIED_BY_FIELD,
                     accessControlManager.getCurrentUserId());
             LOGGER.debug("New Content with {} {} ", id, toSave);
         } else if (content.isUpdated()) {
@@ -350,10 +361,10 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
             for (String field : PROTECTED_FIELDS) {
                 LOGGER.debug ("Resetting value for {} to {}", field, originalProperties.get(field));
-                setField(isAdmin, toSave, field, originalProperties.get(field));
+                setField(toSave, field, originalProperties.get(field));
             }
 
-            id = (String)toSave.get(UUID_FIELD);
+            id = (String)toSave.get(Content.getUuidFeld());
             toSave.put(LASTMODIFIED_FIELD, System.currentTimeMillis());
             toSave.put(LASTMODIFIED_BY_FIELD,
                     accessControlManager.getCurrentUserId());
@@ -382,9 +393,10 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         content.reset(getCached(keySpace, contentColumnFamily, id));
         eventListener.onUpdate(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), isnew, originalProperties, "op:update");
     }
+    
 
-    private void setField(boolean isAdmin, Map<String, Object> toSave, String field, Object value) {
-        if ( isAdmin && toSave.containsKey(field)) {
+    private void setField(Map<String, Object> toSave, String field, Object value) {
+        if ( maintanenceMode && toSave.containsKey(field)) {
             return;
         }
         toSave.put(field, value);
@@ -422,6 +434,11 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         checkOpen();
         accessControlManager.check(Security.ZONE_CONTENT, path, Permissions.CAN_WRITE);
         Map<String, Object> structure = getCached(keySpace, contentColumnFamily, path);
+        if ( structure == null || structure.size() == 0 ) {
+            Content content = new Content(path,null);
+            update(content);
+            structure = getCached(keySpace, contentColumnFamily, path);
+        }
         String contentId = (String)structure.get(STRUCTURE_UUID_FIELD);
         Map<String, Object> content = getCached(keySpace, contentColumnFamily, contentId);
         boolean isnew = true;
@@ -501,6 +518,10 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         if (f == null) {
             throw new StorageClientException(" Source content " + from + " does not exist");
         }
+        if ( f.getProperty(Content.getUuidFeld()) == null ) {
+            LOGGER.warn("Bad Content item with no ID cant be copied {} ",f);
+            throw new StorageClientException(" Source content " + from + "  Has no "+Content.getUuidFeld());      
+        }
         Content t = get(to);
         if (t != null) {
            LOGGER.debug("Deleting {} ",to);
@@ -524,7 +545,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
             copyProperties.putAll(f.getProperties());
         }
         copyProperties.put(COPIED_FROM_PATH_FIELD, from);
-        copyProperties.put(COPIED_FROM_ID_FIELD, f.getProperty(UUID_FIELD));
+        copyProperties.put(COPIED_FROM_ID_FIELD, f.getProperty(Content.getUuidFeld()));
         copyProperties.put(COPIED_DEEP_FIELD, withStreams);
         t = new Content(to, copyProperties);
         update(t);
@@ -667,7 +688,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
         // versionHistoryId is the UUID of the version history for this node.
 
-        String saveVersionId = (String)saveVersion.get(UUID_FIELD);
+        String saveVersionId = (String)saveVersion.get(Content.getUuidFeld());
         
         String versionHistoryId = (String)saveVersion.get(VERSION_HISTORY_ID_FIELD);
 
@@ -686,7 +707,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
         String saveBlockId = (String)saveVersion.get(BLOCKID_FIELD);
 
-        newVersion.put(UUID_FIELD, newVersionId);
+        newVersion.put(Content.getUuidFeld(), newVersionId);
         newVersion.put(PREVIOUS_VERSION_UUID_FIELD, saveVersionId);
         if (saveBlockId != null) {
             newVersion.put(PREVIOUS_BLOCKID_FIELD, saveBlockId);
@@ -864,6 +885,17 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         }
     };
     }
+    
+    public int count(Map<String, Object> countSearch) throws StorageClientException {
+        Builder<String, Object> b = ImmutableMap.builder();
+        b.putAll(countSearch);
+        b.put(StorageConstants.CUSTOM_STATEMENT_SET, "countestimate");
+        b.put(StorageConstants.RAWRESULTS, true);
+        Iterator<Map<String,Object>> counts = client.find(keySpace, contentColumnFamily, b.build());
+        Map<String, Object> count = counts.next();
+        return Integer.parseInt(String.valueOf(count.get("1")));
+    }
+
 
     public boolean hasBody(String path, String streamId) throws StorageClientException, AccessDeniedException {
         Content content = get(path);
@@ -877,5 +909,6 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
     public void cleanPrincipalTokenResolver() {
         accessControlManager.clearRequestPrincipalResolver();
     }
+
 
 }
