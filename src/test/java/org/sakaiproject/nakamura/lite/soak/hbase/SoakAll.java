@@ -15,20 +15,19 @@
  * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-package org.sakaiproject.nakamura.lite.storage;
+package org.sakaiproject.nakamura.lite.soak.hbase;
 
-import java.util.Iterator;
+import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.StorageClientException;
+import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 
-/**
- * Disposable Iterators must be closed when they have been used. If they are
- * registered with a disposer, they should be disposed of by the disposer and
- * there is no requirement for the user of the Iterator to dispose of the
- * iterator. Failure to dispose a DispsableIterator will cause resource
- * exhaustion. eg out of SQL cursors, out of files, out of memory.
- * 
- * @author ieb
- * 
- * @param <T>
- */
-public interface DisposableIterator<T> extends Iterator<T>, Disposable {
+import java.io.IOException;
+
+public class SoakAll {
+
+    public static void main(String[] argv) throws ClientPoolException, StorageClientException,
+            AccessDeniedException, ClassNotFoundException, IOException {
+        CreateUsersAndGroupsSoak.main(argv);
+        CreateUsersAndGroupsWithMembersSoak.main(argv);
+    }
 }

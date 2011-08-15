@@ -66,6 +66,7 @@ import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.lite.util.PreemptiveIterator;
 import org.sakaiproject.nakamura.lite.CachingManager;
+import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,7 +148,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
     private static final Set<String> PROTECTED_FIELDS = ImmutableSet.of(LASTMODIFIED_FIELD,
                                                                         LASTMODIFIED_BY_FIELD,
-                                                                        Content.getUuidFeld(),
+                                                                        Content.getUuidField(),
                                                                         PATH_FIELD);
 
 
@@ -240,7 +241,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
 
     public Iterator<Content> listChildren(String path) throws StorageClientException {
-        final Iterator<Map<String, Object>> childContent = client.listChildren(keySpace,
+        final DisposableIterator<Map<String, Object>> childContent = client.listChildren(keySpace,
                 contentColumnFamily, path);
         return new PreemptiveIterator<Content>() {
 
@@ -263,7 +264,13 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                         LOGGER.debug(e.getMessage(),e);
                     }
                 }
-                return (content != null);
+                if  (content == null) {
+                    // this is over the top as a disposable iterator should close auto
+                    childContent.close();
+                    close();
+                    return false;
+                }
+                return true;
             }
 
             @Override
@@ -304,6 +311,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 }
                 LOGGER.debug("No more");
                 childPath = null;
+                close();
                 return false;
             }
 
@@ -347,7 +355,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
             toSave =  Maps.newHashMap(content.getPropertiesForUpdate());
             id = StorageClientUtils.getInternalUuid();
             // if the user is admin we allow overwriting of protected fields. This should allow content migration.
-            setField(toSave, Content.getUuidFeld(), id);
+            setField(toSave, Content.getUuidField(), id);
             toSave.put(PATH_FIELD, path);
             setField(toSave, CREATED_FIELD, System.currentTimeMillis());
             setField(toSave, CREATED_BY_FIELD, accessControlManager.getCurrentUserId());
@@ -364,7 +372,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 setField(toSave, field, originalProperties.get(field));
             }
 
-            id = (String)toSave.get(Content.getUuidFeld());
+            id = (String)toSave.get(Content.getUuidField());
             toSave.put(LASTMODIFIED_FIELD, System.currentTimeMillis());
             toSave.put(LASTMODIFIED_BY_FIELD,
                     accessControlManager.getCurrentUserId());
@@ -518,9 +526,9 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         if (f == null) {
             throw new StorageClientException(" Source content " + from + " does not exist");
         }
-        if ( f.getProperty(Content.getUuidFeld()) == null ) {
+        if ( f.getProperty(Content.getUuidField()) == null ) {
             LOGGER.warn("Bad Content item with no ID cant be copied {} ",f);
-            throw new StorageClientException(" Source content " + from + "  Has no "+Content.getUuidFeld());      
+            throw new StorageClientException(" Source content " + from + "  Has no "+Content.getUuidField());      
         }
         Content t = get(to);
         if (t != null) {
@@ -545,7 +553,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
             copyProperties.putAll(f.getProperties());
         }
         copyProperties.put(COPIED_FROM_PATH_FIELD, from);
-        copyProperties.put(COPIED_FROM_ID_FIELD, f.getProperty(Content.getUuidFeld()));
+        copyProperties.put(COPIED_FROM_ID_FIELD, f.getProperty(Content.getUuidField()));
         copyProperties.put(COPIED_DEEP_FIELD, withStreams);
         t = new Content(to, copyProperties);
         update(t);
@@ -688,7 +696,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
         // versionHistoryId is the UUID of the version history for this node.
 
-        String saveVersionId = (String)saveVersion.get(Content.getUuidFeld());
+        String saveVersionId = (String)saveVersion.get(Content.getUuidField());
         
         String versionHistoryId = (String)saveVersion.get(VERSION_HISTORY_ID_FIELD);
 
@@ -707,7 +715,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
 
         String saveBlockId = (String)saveVersion.get(BLOCKID_FIELD);
 
-        newVersion.put(Content.getUuidFeld(), newVersionId);
+        newVersion.put(Content.getUuidField(), newVersionId);
         newVersion.put(PREVIOUS_VERSION_UUID_FIELD, saveVersionId);
         if (saveBlockId != null) {
             newVersion.put(PREVIOUS_BLOCKID_FIELD, saveBlockId);
@@ -851,7 +859,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         public Iterator<Content> iterator() {
             Iterator<Content> contentResultsIterator = null;
             try {
-              final Iterator<Map<String,Object>> clientSearchKeysIterator = client.find(keySpace, contentColumnFamily, finalSearchProperties);
+              final DisposableIterator<Map<String,Object>> clientSearchKeysIterator = client.find(keySpace, contentColumnFamily, finalSearchProperties);
               contentResultsIterator = new PreemptiveIterator<Content>() {
                   Content contentResult;
 
@@ -871,12 +879,22 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                               LOGGER.debug(e.getMessage(),e);
                           }
                       }
-                      return (contentResult != null);
+                      if (contentResult == null) {
+                          close();
+                          return false;
+                      }
+                      return true;
                   }
 
                   protected Content internalNext() {
                       return contentResult;
                   }
+                  
+                  @Override
+                  public void close() {
+                      clientSearchKeysIterator.close();
+                      super.close();
+                  };
               };
             } catch (StorageClientException e) {
               LOGGER.error("Unable to iterate over sparsemap search results.", e);
@@ -891,9 +909,15 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         b.putAll(countSearch);
         b.put(StorageConstants.CUSTOM_STATEMENT_SET, "countestimate");
         b.put(StorageConstants.RAWRESULTS, true);
-        Iterator<Map<String,Object>> counts = client.find(keySpace, contentColumnFamily, b.build());
-        Map<String, Object> count = counts.next();
-        return Integer.parseInt(String.valueOf(count.get("1")));
+        DisposableIterator<Map<String,Object>> counts = client.find(keySpace, contentColumnFamily, b.build());
+        try {
+            Map<String, Object> count = counts.next();
+            return Integer.parseInt(String.valueOf(count.get("1")));
+        } finally {
+            if ( counts != null ) {
+                counts.close();
+            }
+        }
     }
 
 
