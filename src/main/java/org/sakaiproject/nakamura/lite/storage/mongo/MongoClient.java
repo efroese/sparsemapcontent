@@ -107,6 +107,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		DBObject query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 
 		// The values we're going to put in mongo
+		mutableValues.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);
 
 		// Update or insert a single document.
