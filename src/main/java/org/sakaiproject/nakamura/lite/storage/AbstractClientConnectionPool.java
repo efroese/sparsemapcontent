@@ -65,14 +65,20 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
     @Property(intValue = 0)
     private static final String LONG_STRING_SIZE = "long-string-size";
 
+    public  static final String DEFAULT_FILE_STORE = "store";
+    @Property(value = "store")
+    public static final String FS_STORE_BASE_DIR = "store-base-dir";
+
     @Reference
     private Configuration configuration;
 
-    private Set<String> indexColums;
+    private Set<String> indexColumns;
 
 
 
     private GenericObjectPool pool;
+
+    private Set<String> indexColumnsTypes;
 
 
     public AbstractClientConnectionPool() {
@@ -84,7 +90,8 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
         if ( configuration == null ) {
             configuration = (Configuration) properties.get(Configuration.class.getName());
         }
-        indexColums = ImmutableSet.of(configuration.getIndexColumnNames());
+        indexColumns = ImmutableSet.of(configuration.getIndexColumnNames());
+        indexColumnsTypes = ImmutableSet.of(configuration.getIndexColumnTypes());
         int maxActive = StorageClientUtils.getSetting(properties.get(MAX_ACTIVE), 200);
         byte whenExhaustedAction = GenericObjectPool.DEFAULT_WHEN_EXHAUSTED_ACTION;
         String whenExhausted = (String) properties.get(WHEN_EHAUSTED);
@@ -130,8 +137,13 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
     }
 
     public Set<String> getIndexColumns() {
-        return indexColums;
+        return indexColumns;
     }
+
+    public Set<String> getIndexColumnsTypes() {
+        return indexColumnsTypes;
+    }
+
 
     /*
      * (non-Javadoc)

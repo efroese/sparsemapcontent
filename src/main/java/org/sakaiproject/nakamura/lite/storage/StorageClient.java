@@ -17,13 +17,12 @@
  */
 package org.sakaiproject.nakamura.lite.storage;
 
-import org.sakaiproject.nakamura.api.lite.StorageClientException;
-import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Iterator;
 import java.util.Map;
+
+import org.sakaiproject.nakamura.api.lite.StorageClientException;
+import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 
 public interface StorageClient {
 
@@ -102,7 +101,7 @@ public interface StorageClient {
      * @return an iterator of results
      * @throws StorageClientException
      */
-    Iterator<Map<String, Object>> find(String keySpace, String authorizableColumnFamily,
+    DisposableIterator<Map<String, Object>> find(String keySpace, String authorizableColumnFamily,
             Map<String, Object> properties) throws StorageClientException;
 
     /**
@@ -128,5 +127,23 @@ public interface StorageClient {
      * @return whether or not the stream exists for this content item
      */
     boolean hasBody( Map<String, Object> content, String streamId);
+
+    /**
+     * List all objects of the type
+     * @param keySpace the key space
+     * @param columnFamily
+     * @return a Disposable iterator containing all raw objects of the type in question.
+     * @throws StorageClientException 
+     */
+    DisposableIterator<SparseRow> listAll(String keySpace, String columnFamily) throws StorageClientException;
+
+    /**
+     * Count all the objects in a column Family.
+     * @param keySpace
+     * @param columnFamily
+     * @return the number of objects
+     * @throws StorageClientException 
+     */
+    long allCount(String keySpace, String columnFamily) throws StorageClientException;
 
 }

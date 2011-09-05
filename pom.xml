@@ -1,70 +1,33 @@
 <?xml version="1.0"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
+ <parent>
+    <groupId>org.sakaiproject.nakamura</groupId>
+    <artifactId>core-base</artifactId>
+    <version>1-SNAPSHOT</version>
+    <relativePath>parent/pom.xml</relativePath>
+  </parent>
   <groupId>org.sakaiproject.nakamura</groupId>
   <artifactId>org.sakaiproject.nakamura.core</artifactId>
   <packaging>bundle</packaging>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.1-SNAPSHOT</version>
   <name>Sakai Nakamura :: Sparse Map Content Storage bundle.</name>
   <description>Server that uses a sparse map to represent content mapping closely to a colum database like Cassandra.</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
   </properties>
+  <scm>
+    <connection>scm:git:git://github.com/ieb/sparsemapcontent.git</connection>
+    <developerConnection>scm:git:git@github.com:ieb/sparsemapcontent.git</developerConnection>
+    <url>http://github.com/ieb/sparsemapcontent/</url>
+  </scm>
+  <prerequisites>
+    <maven>3.3.0</maven>
+  </prerequisites>
+
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>2.0.2</version>
-        <configuration>
-          <source>1.5</source>
-          <target>1.5</target>
-          <showDeprecation>true</showDeprecation>
-          <compilerArgument>-Xlint:unchecked,deprecation,fallthrough,finally</compilerArgument>
-          <fork>true</fork>
-          <encoding>${project.build.sourceEncoding}</encoding>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <version>2.0.4</version>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <phase>package</phase>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <excludeResources>true</excludeResources>
-          <attach>true</attach>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.felix</groupId>
-        <artifactId>maven-scr-plugin</artifactId>
-        <version>1.4.4</version>
-        <dependencies>
-          <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.5.2</version>
-          </dependency>
-        </dependencies>
-        <executions>
-          <execution>
-            <id>generate-scr-scrdescriptor</id>
-            <goals>
-              <goal>scr</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
@@ -72,11 +35,13 @@
         <extensions>true</extensions>
         <configuration>
           <instructions>
-            <Bundle-Category>sakai-nakamura</Bundle-Category>
+            <Bundle-Category>sparsemapcontent</Bundle-Category>
+            <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
             <Export-Package>
               org.sakaiproject.nakamura.api.lite.*
 			</Export-Package>
 			<DynamicImport-Package>*</DynamicImport-Package>
+               
 			<Import-Package>
 			   !org.apache.xpath.*,
 			   !org.apache.xalan.*,
@@ -96,7 +61,7 @@
                 -->
                *
 			</Import-Package>
-            <Private-Package>org.sakaiproject.nakamura.lite.*</Private-Package>
+            <Private-Package>!org.sakaiproject.nakamura.lite.storage.hbase.*,org.sakaiproject.nakamura.lite.*</Private-Package>
             <!-- For Oracle, include ojdbc in your Embed-Dependency element -->
             <!-- <Embed-Dependency>libthrift,apache-cassandra,mysql-connector-java,derby,ojdbc</Embed-Dependency> -->
             <!--  <Embed-Dependency>libthrift,apache-cassandra,mysql-connector-java,derby</Embed-Dependency> -->
@@ -106,34 +71,24 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.5</version>
-      </plugin>
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-surefire-plugin</artifactId>
+       <version>2.5</version>
+       <configuration>
+         <includes>
+               <include>**/Test*.java</include>
+               <include>**/*Test.java</include>
+               <include>**/*TestCase.java</include>
+       <!-- Uncomment includes to enable database specific tests.
+             Ensure you modify the setup java e.g. \src\test\java\org\sakaiproject\nakamura\lite\jdbc\oracle\oraclesetup.java to include your database connection details -->
+               <!-- <include>**/oracle/*Man.java</include> -->
+               <!-- <include>**/mysql/*Man.java</include> -->
+               <!-- <include>**/postgresql/*Man.java</include> -->
+         </includes>
+       </configuration>
+     </plugin>
     </plugins>
   </build>
-  <profiles>     
-   <profile>
-      <id>redeploy</id>
-      <build>
-       <plugins>
-         <plugin>
-          <groupId>org.apache.sling</groupId>
-          <artifactId>maven-sling-plugin</artifactId>
-          <version>2.0.5-SNAPSHOT</version>
-          <executions>
-            <execution>
-              <id>install-bundle</id>
-              <goals>
-                <goal>install</goal>
-              </goals>
-            </execution>
-          </executions>
-         </plugin>
-       </plugins>
-      </build>
-    </profile>
-  </profiles>
   <dependencies>
   
      
@@ -189,11 +144,13 @@
       <groupId>org.apache.felix</groupId>
       <artifactId>org.osgi.core</artifactId>
       <version>1.2.0</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.osgi.compendium</artifactId>
       <version>1.2.0</version>
+      <scope>provided</scope>
     </dependency>
     
 
@@ -237,11 +194,16 @@
 	  <artifactId>postgresql</artifactId>
 	  <version>9.0-801.jdbc4</version>    
     </dependency>
-
     <dependency>
         <groupId>org.mongodb</groupId>
         <artifactId>mongo-java-driver</artifactId>
         <version>2.6.2</version>
+    </dependency>
+    <dependency>
+	  <groupId>org.apache.hbase</groupId>
+	  <artifactId>hbase</artifactId>
+	  <version>0.90.3</version>    
+          <scope>provided</scope>
     </dependency>
 <!--
     To use Oracle, install ojdbc14.jar to your local mvn
@@ -275,83 +237,4 @@
 <!-- just needed for compiling, not runtime -->
     </dependency>
   </dependencies>
-  <reporting>
-    <plugins>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-        <version>2.3.1</version>
-        <configuration>
-          <effort>Max</effort>
-          <threshold>Low</threshold>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jxr-plugin</artifactId>
-        <version>2.2</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-pmd-plugin</artifactId>
-        <version>2.5</version>
-        <configuration>
-          <targetJdk>1.6</targetJdk>
-          <sourceEncoding>UTF-8</sourceEncoding>
-          <linkXref>true</linkXref>
-          <rulesets>
-            <ruleset>/rulesets/internal/all-java.xml</ruleset>
-          </rulesets>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>cobertura-maven-plugin</artifactId>
-        <version>2.4</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-report-plugin</artifactId>
-        <version>2.6</version>
-      </plugin>
-    </plugins>
-  </reporting>
-<!-- ====================================================================== -->
-<!-- D I S T R I B U T I O N M A N A G E M E N T -->
-<!-- ====================================================================== -->
-  <distributionManagement>
-    <downloadUrl>http://source.sakaiproject.org/maven2/</downloadUrl>
-    <snapshotRepository>
-       <uniqueVersion>false</uniqueVersion>
-       <id>sakai-maven-snapshots-scp</id>
-       <name>Sakai snapshot Repo</name>
-       <url>scp://source.sakaiproject.org/var/www/html/maven2-snapshots</url>
-       <layout>default</layout>
-    </snapshotRepository>
-    <repository>
-      <uniqueVersion>false</uniqueVersion>
-      <id>sakai-maven2-scp</id>
-      <name>Sakai maven2 repository</name>
-      <url>scp://source.sakaiproject.org/var/www/html/maven2</url>
-      <layout>default</layout>
-    </repository>
-    <site>
-      <id>sakai-site</id>
-      <name>Sakai release Site</name>
-      <url>scp://source.sakaiproject.org/var/www/html/release/nakamura/${project.version}</url>
-    </site>
-  </distributionManagement>
-  <repositories>
-    <repository>
-      <id>sakai-releases</id>
-      <name>Sakai Releases</name>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <url>http://source.sakaiproject.org/maven2/</url>
-    </repository>
-  </repositories>
 </project>

@@ -36,21 +36,29 @@ block-select-row = select b from css_b where rid = ?
 block-delete-row = delete from css_b where rid = ?
 block-insert-row = insert into css_b (rid,b) values (?, ?)
 block-update-row = update css_b set b = ? where rid = ?
+list-all = select rid, b from css_b
+list-all-count = select count(*) from css_b
 
 block-select-row.n.ac = select b from ac_css_b where rid = ?
 block-delete-row.n.ac = delete from ac_css_b where rid = ?
 block-insert-row.n.ac = insert into ac_css_b (rid,b) values (?, ?)
 block-update-row.n.ac = update ac_css_b set b = ? where rid = ?
+list-all.n.ac = select rid, b from ac_css_b
+list-all-count.n.ac = select count(*) from ac_css_b
 
 block-select-row.n.cn = select b from cn_css_b where rid = ?
 block-delete-row.n.cn = delete from cn_css_b where rid = ?
 block-insert-row.n.cn = insert into cn_css_b (rid,b) values (?, ?)
 block-update-row.n.cn = update cn_css_b set b = ? where rid = ?
+list-all.n.cn = select rid, b from cn_css_b
+list-all-count.n.cn = select count(*) from cn_css_b
 
 block-select-row.n.au = select b from au_css_b where rid = ?
 block-delete-row.n.au = delete from au_css_b where rid = ?
 block-insert-row.n.au = insert into au_css_b (rid,b) values (?, ?)
 block-update-row.n.au = update au_css_b set b = ? where rid = ?
+list-all.n.au = select rid, b from au_css_b
+list-all-count.n.au = select count(*) from au_css_b
 
 # base statement with paging ; table join ; where clause ; where clause for sort field (if needed) ; order by clause; sort field column( if needed)
 ## the subselect in the paging statement is required by Oracle to do paging. http://www.oracle.com/technetwork/issue-archive/2006/06-sep/o56asktom-086197.html
@@ -58,6 +66,16 @@ block-find = select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2} limit 
 block-find.n.au = select distinct a.rid {5} from au_css a {0} where {1} 1 = 1 {2} limit {3,number,#} offset {4,number,#};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
 block-find.n.cn = select distinct a.rid {5} from cn_css a {0} where {1} 1 = 1 {2} limit {3,number,#} offset {4,number,#};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
 block-find.n.ac = select distinct a.rid {5} from ac_css a {0} where {1} 1 = 1 {2} limit {3,number,#} offset {4,number,#};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+
+listchildren = select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2};, css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.au = select distinct a.rid {5} from au_css a {0} where {1} 1 = 1 {2};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.cn = select distinct a.rid {5} from cn_css a {0} where {1} 1 = 1 {2};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.ac = select distinct a.rid {5} from ac_css a {0} where {1} 1 = 1 {2};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+
+countestimate = select count(*) from (select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2}) as tocount;, css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.au = select count(*) from (select distinct a.rid {5} from au_css a {0} where {1} 1 = 1 {2}) as tocount;, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.cn = select count(*) from (select distinct a.rid {5} from cn_css a {0} where {1} 1 = 1 {2}) as tocount;, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.ac = select count(*) from (select distinct a.rid {5} from ac_css a {0} where {1} 1 = 1 {2}) as tocount;, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
 
 
 # statement to validate the connection

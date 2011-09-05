@@ -34,6 +34,8 @@ import org.sakaiproject.nakamura.lite.content.BlockContentHelper;
 import org.sakaiproject.nakamura.lite.content.BlockSetContentHelper;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
+import org.sakaiproject.nakamura.lite.storage.SparseMapRow;
+import org.sakaiproject.nakamura.lite.storage.SparseRow;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -260,6 +262,7 @@ public class MemoryStorageClient implements StorageClient {
                    }
                 }
                 nextMap = null;
+                super.close();
                 return false;
             }
 
@@ -282,6 +285,43 @@ public class MemoryStorageClient implements StorageClient {
         String hash = rowHash(keySpace, columnFamily, key);
         LOGGER.debug("Finding {}:{}:{} as {} ",new Object[]{keySpace,columnFamily, key, hash});
         return find(keySpace, columnFamily, ImmutableMap.of(InternalContent.PARENT_HASH_FIELD, (Object)hash));
+    }
+
+    public DisposableIterator<SparseRow> listAll(String keySpace, String columnFamily) {
+        final Iterator<Entry<String, Object>> entries = store.entrySet().iterator();
+        final String keyMatch = keySpace+":"+columnFamily+":";
+        return new PreemptiveIterator<SparseRow>() {
+
+            private SparseRow nextRow = null;
+
+            @SuppressWarnings("unchecked")
+            @Override
+            protected boolean internalHasNext() {
+                while(entries.hasNext()) {
+                   Entry<String, Object> e = entries.next();
+                   if ( e.getKey().startsWith(keyMatch)) {
+                       Map<String, Object>nextMap = (Map<String, Object>) e.getValue();
+                       if ( nextMap != null ) {
+                           nextRow = new SparseMapRow(e.getKey(),nextMap);
+                           return true;
+                       }
+                   }
+                }
+                nextRow = null;
+                super.close();
+                return false;
+            }
+
+            @Override
+            protected SparseRow internalNext() {
+                return nextRow;
+            }
+        };
+    }
+
+    public long allCount(String keySpace, String columnFamily) {
+        // TODO Auto-generated method stub
+        return 0;
     }
 
 

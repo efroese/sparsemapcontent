@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+
 /**
  * Specification of a modification to be applied to an ACL.
  */
@@ -186,7 +187,13 @@ public class AclModification {
         if (principalKey.length() <= GRANTED_MARKER.length()) {
             return null;
         }
-        return principalKey.substring(0, principalKey.length()-GRANTED_MARKER.length());
+        if ( principalKey.endsWith(GRANTED_MARKER) ) {
+          return principalKey.substring(0, principalKey.length()-GRANTED_MARKER.length());
+        } else if ( principalKey.endsWith(DENIED_MARKER) ) {
+          return principalKey.substring(0, principalKey.length()-DENIED_MARKER.length());
+        } else {
+          return null;
+        }
     }
     
     
@@ -199,6 +206,10 @@ public class AclModification {
             }
         }
         return permissions.toArray(new Permission[permissions.size()]);
+    }
+
+    public static String getPropertyKey(String id, String propertyName) {
+        return AccessControlManager.PROPERTY_PRINCIPAL_STEM+id+"@"+propertyName;
     }
 
 }

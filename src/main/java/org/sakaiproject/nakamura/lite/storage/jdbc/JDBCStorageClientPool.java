@@ -17,10 +17,19 @@
  */
 package org.sakaiproject.nakamura.lite.storage.jdbc;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
-
-import edu.umd.cs.findbugs.annotations.SuppressWarnings;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Enumeration;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Timer;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.pool.PoolableObjectFactory;
@@ -44,19 +53,10 @@ import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Enumeration;
-import java.util.Properties;
-import java.util.Timer;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
+
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 
 @Component(immediate = true, metatype = true, inherit = true)
 @Service(value = StorageClientPool.class)
@@ -98,7 +98,7 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
 
         public Object makeObject() throws Exception {
             return checkSchema(new JDBCStorageClient(JDBCStorageClientPool.this, properties,
-                    getSqlConfig(), getIndexColumns()));
+                    getSqlConfig(), getIndexColumns(), getIndexColumnsTypes(), getIndexColumnsNames() ));
         }
 
         public void passivateObject(Object obj) throws Exception {
@@ -138,6 +138,7 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
 
     private Map<String, CacheHolder> sharedCache;
 
+    private Map<String, String> indexColumnsMap;
 
     @Override
     @Activate
@@ -176,11 +177,7 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
             LOGGER.info("Loaded Driver Class {} with classloader {} ", driverClass, driverClass.getClassLoader());
             try {
                 Driver d = (Driver) driverClass.newInstance();
-                if ( d == null ) {
-                    LOGGER.error("Error creating driver instance, got null from {} ",driverClass);
-                } else {
-                    LOGGER.info("Created Driver Instance as {} ", d);
-                }
+                LOGGER.info("Created Driver Instance as {} ", d);
             } catch (InstantiationException e) {
                 LOGGER.info("Error Creating Driver {} ", driverClass, e);
             } catch (IllegalAccessException e) {
@@ -219,6 +216,14 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
         }
 
     }
+
+
+
+
+    public Map<String, String> getIndexColumnsNames() {
+        return indexColumnsMap;
+    }
+
 
     @Override
     @Deactivate
@@ -270,6 +275,7 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
                     LOGGER.info("   Database URL   : {} ", properties.get(CONNECTION_URL));
                     client.checkSchema(getClientConfigLocations(client.getConnection()));
                     schemaHasBeenChecked = true;
+                    indexColumnsMap = client.syncIndexColumns();
                 } catch (Throwable e) {
                     LOGGER.warn("Failed to check Schema", e);
                 }

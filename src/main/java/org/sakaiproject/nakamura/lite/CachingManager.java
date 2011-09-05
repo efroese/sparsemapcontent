@@ -63,9 +63,10 @@ public abstract class CachingManager {
 
 
         if (sharedCache != null && sharedCache.containsKey(cacheKey)) {
-            CacheHolder aclCacheHolder = sharedCache.get(cacheKey);
-            if (aclCacheHolder != null) {
-                m = aclCacheHolder.get();
+            CacheHolder cacheHolder = sharedCache.get(cacheKey);
+            if (cacheHolder != null) {
+                m = cacheHolder.get();
+                LOGGER.debug("Cache Hit {} {} {} ",new Object[]{cacheKey, cacheHolder, m});
                 hit++;
             }
         }
@@ -74,13 +75,13 @@ public abstract class CachingManager {
             miss++;
             if (sharedCache != null) {
                 if (m != null) {
-                    LOGGER.debug("Found Map {} {}", cacheKey, m);
+                    LOGGER.debug("Cache Miss, Found Map {} {}", cacheKey, m);
                 }
                 sharedCache.put(cacheKey, new CacheHolder(m));
             }
         }
         calls++;
-        if ((calls % 1000) == 0) {
+        if ((calls % 10000) == 0) {
             getLogger().info("Cache Stats Hits {} Misses {}  hit% {}", new Object[] { hit, miss,
                     ((100 * hit) / (hit + miss)) });
         }
