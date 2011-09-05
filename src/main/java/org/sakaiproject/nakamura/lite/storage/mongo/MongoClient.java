@@ -48,7 +48,6 @@ public class MongoClient implements StorageClient, RowHasher {
 	private StreamedContentHelper streamedContentHelper;
 
 	public MongoClient(DB mongodb, Map<String,Object> props) {
-		log.debug("Created");
 		this.mongodb = mongodb;
 
 		String user = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), MongoClientPool.PROP_MONGO_USER);
@@ -57,7 +56,6 @@ public class MongoClient implements StorageClient, RowHasher {
 			this.mongodb.authenticate("admin", "admin".toCharArray());
 		}
 		this.mongodb.requestStart();
-
 		this.streamedContentHelper = new FileStreamContentHelper(this, props);
 	}
 
@@ -68,7 +66,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public Map<String, Object> get(String keySpace, String columnFamily,
 			String key) throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
-		log.info("get {}:{}:{}", new Object[]{keySpace, columnFamily, key});
+		log.debug("get {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
 		// Pretty straightforward. Just query by the id.
@@ -121,7 +119,7 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		// Update or insert a single document.
 		collection.update(query, insert, true, false);
-		log.info("insert {}:{}:{} => {}", new Object[] {keySpace, columnFamily, key, insert.toString()});
+		log.debug("insert {}:{}:{} => {}", new Object[] {keySpace, columnFamily, key, insert.toString()});
 	}
 
 	/*
@@ -131,7 +129,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public void remove(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
-		log.info("remove {}:{}:{}", new Object[]{keySpace, columnFamily, key});
+		log.debug("remove {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject();
 		query.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
@@ -142,7 +140,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			String columnFamily) throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
 
-		log.info("listAll {}:{}", new Object[]{keySpace, columnFamily});
+		log.debug("listAll {}:{}", new Object[]{keySpace, columnFamily});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
 		final DBCursor cursor = collection.find();
@@ -172,7 +170,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public long allCount(String keySpace, String columnFamily)
 			throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
-		log.info("allCount {}:{}", new Object[]{keySpace, columnFamily});
+		log.debug("allCount {}:{}", new Object[]{keySpace, columnFamily});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		return collection.count();
 	}
@@ -360,7 +358,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			ridkey = keystring.getBytes();
 		}
 		String hash = StorageClientUtils.encode(hasher.digest(ridkey));
-		log.info("{}:{}:{} => {}", new Object[]{keySpace, columnFamily, key, hash});
+		log.debug("rowHash: {}:{}:{} => {}", new Object[]{keySpace, columnFamily, key, hash});
 		return hash;
 	}
 }
