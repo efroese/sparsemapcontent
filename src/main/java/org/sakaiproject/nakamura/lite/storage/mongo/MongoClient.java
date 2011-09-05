@@ -66,12 +66,13 @@ public class MongoClient implements StorageClient, RowHasher {
 	 */
 	public Map<String, Object> get(String keySpace, String columnFamily,
 			String key) throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		log.info("get {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
 		// Pretty straightforward. Just query by the id.
 		BasicDBObject query = new BasicDBObject();
-		query.put("id", key);
+		query.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 		DBCursor cursor = collection.find(query);
 		Map<String,Object> result = null;
 		if (cursor.size() == 1){
@@ -90,6 +91,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public void insert(String keySpace, String columnFamily, String key,
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		HashMap<String,Object> mutableValues = new HashMap<String,Object>(values);
 		// Set the parent path hash if this is a piece of content
 		if (values.keySet().contains(InternalContent.PATH_FIELD)) {
@@ -102,7 +104,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
 		// document to update.
-		DBObject query = new BasicDBObject("id", key);
+		DBObject query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 
 		// The values we're going to put in mongo
 		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);
@@ -118,15 +120,18 @@ public class MongoClient implements StorageClient, RowHasher {
 	 */
 	public void remove(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		log.info("remove {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject();
-		query.put("id", key);
+		query.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 		collection.remove(query);
 	}
 
 	public DisposableIterator<SparseRow> listAll(String keySpace,
 			String columnFamily) throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
+
 		log.info("listAll {}:{}", new Object[]{keySpace, columnFamily});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
@@ -160,6 +165,7 @@ public class MongoClient implements StorageClient, RowHasher {
 
 	public long allCount(String keySpace, String columnFamily)
 			throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		log.info("allCount {}:{}", new Object[]{keySpace, columnFamily});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		return collection.count();
@@ -173,6 +179,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			String contentId, String contentBlockId, String streamId,
 			Map<String, Object> content) throws StorageClientException,
 			AccessDeniedException, IOException {
+		columnFamily = columnFamily.toLowerCase();
 		return streamedContentHelper.readBody(keySpace, columnFamily, contentBlockId, streamId, content);
 	}
 
@@ -184,6 +191,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			String columnFamily, String contentId, String contentBlockId,
 			String streamId, Map<String, Object> content, InputStream in)
 			throws StorageClientException, AccessDeniedException, IOException {
+		columnFamily = columnFamily.toLowerCase();
 		Map<String,Object> meta = streamedContentHelper.writeBody(keySpace, columnFamily, contentId, contentBlockId, streamId, content, in);
 		return meta;
 	}
@@ -196,6 +204,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public DisposableIterator<Map<String, Object>> find(String keySpace,
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		DBCollection collection = mongodb.getCollection(columnFamily);
 		BasicDBObject query = new BasicDBObject(properties);
 
@@ -283,6 +292,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public DisposableIterator<Map<String, Object>> listChildren(
 			String keySpace, String columnFamily, String key)
 			throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		// this will load all child object directly.
 		String hash = rowHash(keySpace, columnFamily, key);
 		log.debug("Finding {}:{}:{} as {} ", new Object[]{keySpace,columnFamily, key, hash});
@@ -303,6 +313,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	 */
 	public String rowHash(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
+		columnFamily = columnFamily.toLowerCase();
 		MessageDigest hasher;
 		try {
 			hasher = MessageDigest.getInstance("SHA1");
