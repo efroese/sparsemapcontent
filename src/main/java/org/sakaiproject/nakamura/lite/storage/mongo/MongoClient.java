@@ -13,6 +13,7 @@ import java.util.Map;
 
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.api.lite.StorageConstants;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.lite.content.FileStreamContentHelper;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
@@ -245,36 +246,61 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 		}
 
-		// See if we need to sort
-		final DBCursor cursor = collection.find(query);
-		if (properties.containsKey("_sort")){
-			query.remove("_sort");
-			cursor.sort(new BasicDBObject((String)properties.get("_sort"), 1));
+		String customStatementSet = query.getString(StorageConstants.CUSTOM_STATEMENT_SET);
+		if (customStatementSet != null && "countestimate".equals(customStatementSet)){
+			query.remove(StorageConstants.CUSTOM_STATEMENT_SET);
+			query.remove(StorageConstants.RAWRESULTS);
+			final int count = (int)collection.count(query);
+
+			return new DisposableIterator<Map<String,Object>>() {
+				private boolean hasNext = true;
+
+				// Return true only once.
+				public boolean hasNext() {
+					if (hasNext){
+						hasNext = false;
+						return true;
+					}
+					return hasNext;
+				}
+
+				public Map<String, Object> next() {
+					return ImmutableMap.of("1", (Object)new Integer(count));
+				}
+
+				public void remove() { }
+				public void close() { }
+				public void setDisposer(Disposer disposer) { }
+			};
 		}
-
-		final Iterator<DBObject> itr = cursor.iterator();
-		return new DisposableIterator<Map<String,Object>>() {
-
-			public boolean hasNext() {
-				return itr.hasNext();
+		else {
+			// See if we need to sort
+			final DBCursor cursor = collection.find(query);
+			if (properties.containsKey(StorageConstants.SORT)){
+				query.remove(StorageConstants.SORT);
+				cursor.sort(new BasicDBObject((String)properties.get(StorageConstants.SORT), 1));
 			}
 
-			public Map<String, Object> next() {
-				return MongoUtils.convertDBObjectToMap((DBObject)itr.next());
-			}
+			final Iterator<DBObject> itr = cursor.iterator();
+			return new DisposableIterator<Map<String,Object>>() {
 
-			public void remove() {
-				// TODO Auto-generated method stub
-			}
+				public boolean hasNext() {
+					return itr.hasNext();
+				}
 
-			public void close() {
-				cursor.close();
-			}
+				public Map<String, Object> next() {
+					return MongoUtils.convertDBObjectToMap((DBObject)itr.next());
+				}
 
-			public void setDisposer(Disposer disposer) {
-				// TODO Auto-generated method stub
-			}
-		};
+				public void remove() { }
+
+				public void close() {
+					cursor.close();
+				}
+
+				public void setDisposer(Disposer disposer) { }
+			};
+		}
 	}
 
 	/*
