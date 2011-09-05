@@ -3,6 +3,7 @@ package org.sakaiproject.nakamura.lite.storage.mongo;
 import java.net.UnknownHostException;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Property;
@@ -55,33 +56,30 @@ public class MongoClientPool implements StorageClientPool {
 	public static final String PROP_STOREBASE = "mongo.disk.storage.base";
 
 	private static final String[] DEFAULT_INDEXED_KEYS = new String[] {
-		"au:" + MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
 		"au:rep:principalName",
 		"au:type",
+		"au:_:parenthash",
 
-		"ac:" + MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
+		"ac:_:parenthash",
 
-		"cn:" + MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
-		"cn:sling:resourceType",
-		"cn:sakai:pooled-content-manager",
-
-		"cn:sakai:messagestore",
-		"cn:sakai:type",
-		"cn:sakai:marker",
-
-		"cn:sakai:tag-uuid",
-
-		"cn:sakai:contactstorepath",
-		"cn:sakai:state",
+		"cn:_created",
+		"cn:_:parenthash",
 		"cn:firstName",
 		"cn:lastName",
 
-		"cn:_created",
-
 		"cn:sakai:category",
-		"cn:sakai:messagebox",
+		"cn:sakai:contactstorepath",
 		"cn:sakai:from",
+		"cn:sakai:marker",
+		"cn:sakai:messagebox",
+		"cn:sakai:messagestore",
+		"cn:sakai:pooled-content-manager",
+		"cn:sling:resourceType",
+		"cn:sakai:state",
 		"cn:sakai:subject",
+		"cn:sakai:tag-uuid",
+		"cn:sakai:type",
+
 	};
 	@Property
 	public static final String PROP_INDEXED_COLS = "mongo.indexed.keys";
@@ -117,20 +115,19 @@ public class MongoClientPool implements StorageClientPool {
 
 		for (String name: SPARSE_COLLECTION_NAMES){
 			if (!db.collectionExists(name)){
-				db.createCollection(name, null);
-				DBCollection collection = db.getCollection(name);
-				collection.ensureIndex(new BasicDBObject("id", 1), "id_index", true);
+				DBCollection collection = db.createCollection(name, null);
+				collection.ensureIndex(new BasicDBObject(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD, 1),
+						MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD + "_index", true);
 			}
 		}
 
 		DBCollection collection;
 		String[] keysToIndex = StorageClientUtils.getSetting(props.get(PROP_INDEXED_COLS), DEFAULT_INDEXED_KEYS);
 		for (String toIndex: keysToIndex){
-			int firstColon = toIndex.indexOf(':');
-			String columnFamily = toIndex.substring(0, firstColon);
-			String keyName = toIndex.substring(firstColon + 1);
+			String columnFamily = StringUtils.substringBefore(toIndex, ":");
+			String keyName = StringUtils.substringAfter(toIndex, ":");
 			collection = db.getCollection(columnFamily);
-			collection.ensureIndex(keyName);
+			collection.ensureIndex(new BasicDBObject(keyName, 1), keyName + "_index", false);
 		}
 	}
 
