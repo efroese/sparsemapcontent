@@ -94,21 +94,29 @@ public class MongoClient implements StorageClient, RowHasher {
 	throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
 		HashMap<String,Object> mutableValues = new HashMap<String,Object>(values);
-		// Set the parent path hash if this is a piece of content
-		if (values.keySet().contains(InternalContent.PATH_FIELD)) {
-			if ( !StorageClientUtils.isRoot(key)) {
-				mutableValues.put(InternalContent.PARENT_HASH_FIELD,
-						rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
-			}
+
+		// rewrite _id => MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD
+		if (mutableValues.containsKey(MongoClient.MONGO_INTERNAL_ID_FIELD)){
+			mutableValues.put(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
+					mutableValues.get(MongoClient.MONGO_INTERNAL_ID_FIELD));
+			mutableValues.remove(MongoClient.MONGO_INTERNAL_ID_FIELD);
 		}
+
+		// Set the parent path hash if this is a piece of content
+		if (mutableValues.keySet().contains(InternalContent.PATH_FIELD) && !StorageClientUtils.isRoot(key)) {
+			mutableValues.put(InternalContent.PARENT_HASH_FIELD,
+					rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
+		}
+
+		// Set the primary sparsemapcontent id
+		mutableValues.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
-		// document to update.
+		// The document to update identified is by _sparsemapcontent_id
 		DBObject query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 
-		// The values we're going to put in mongo
-		mutableValues.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
+		// Converts the insert into a bunch of set, unset Mongo operations
 		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);
 
 		// Update or insert a single document.
@@ -147,21 +155,17 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 
 			public SparseRow next() {
-				DBObject next = (DBObject) itr.next();
+				DBObject next = itr.next();
 				return new SparseMapRow((String)next.get(MONGO_INTERNAL_SPARSE_UUID_FIELD),
 						MongoUtils.convertDBObjectToMap(next));			}
 
-			public void remove() {
-				// TODO Auto-generated method stub
-			}
+			public void remove() { }
 
 			public void close() {
 				cursor.close();
 			}
 
-			public void setDisposer(Disposer disposer) {
-				// TODO Auto-generated method stub
-			}
+			public void setDisposer(Disposer disposer) { }
 		};
 	}
 
@@ -280,24 +284,20 @@ public class MongoClient implements StorageClient, RowHasher {
 				query.remove(StorageConstants.SORT);
 				cursor.sort(new BasicDBObject((String)properties.get(StorageConstants.SORT), 1));
 			}
-
 			final Iterator<DBObject> itr = cursor.iterator();
-			return new DisposableIterator<Map<String,Object>>() {
 
+			return new DisposableIterator<Map<String,Object>>() {
 				public boolean hasNext() {
 					return itr.hasNext();
 				}
-
 				public Map<String, Object> next() {
-					return MongoUtils.convertDBObjectToMap((DBObject)itr.next());
+					return MongoUtils.convertDBObjectToMap(itr.next());
 				}
-
-				public void remove() { }
-
 				public void close() {
 					cursor.close();
 				}
 
+				public void remove() { }
 				public void setDisposer(Disposer disposer) { }
 			};
 		}

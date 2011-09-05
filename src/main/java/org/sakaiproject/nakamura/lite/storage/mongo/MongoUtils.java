@@ -31,11 +31,6 @@ public class MongoUtils {
 				setFields.put(key, value);
 			}
 		}
-		// rewrite _id => MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD
-		if (setFields.containsField(MongoClient.MONGO_INTERNAL_ID_FIELD)){
-			setFields.put(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD, setFields.get(MongoClient.MONGO_INTERNAL_ID_FIELD));
-			setFields.removeField(MongoClient.MONGO_INTERNAL_ID_FIELD);
-		}
 		if (setFields.keySet().size() > 0){
 			cleaned.put(Operators.SET, setFields);
 		}
