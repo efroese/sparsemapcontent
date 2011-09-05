@@ -3,6 +3,9 @@
 # PK in these tables
 # The access mechanism must be update then insert to allow no PK and no Unique key.
 # Please read http://harrison-fisk.blogspot.com/2009/02/my-favorite-new-feature-of-mysql-51.html for info.
+#
+# Please read for proper UTF-8 encoding support:
+# http://rentzsch.tumblr.com/post/9133498042/howto-use-utf-8-throughout-your-web-stack
 
 ######## DROP TABLE IF EXISTS `css`;
 
@@ -14,9 +17,9 @@ CREATE TABLE  `css` (
   `cid` varchar(64) NOT NULL,
   `v` varchar(780) NOT NULL,
   PRIMARY KEY  (`id`),
-  KEY `rowkey` USING HASH (`rid`,`cid`),
+  KEY `rowkey`  (`rid`,`cid`),
   KEY `cid_locate_i` (`v`(255),`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 
 ######## DROP TABLE IF EXISTS `au_css`;
@@ -28,9 +31,9 @@ CREATE TABLE  `au_css` (
   `cid` varchar(64) NOT NULL,
   `v` varchar(780) NOT NULL,
   PRIMARY KEY  (`id`),
-  KEY `rowkey` USING HASH (`rid`,`cid`),
+  KEY `rowkey`  (`rid`,`cid`),
   KEY `cid_locate_i` (`v`(255),`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 ####### DROP TABLE IF EXISTS `cn_css`;
 
@@ -41,9 +44,9 @@ CREATE TABLE  `cn_css` (
   `cid` varchar(64) NOT NULL,
   `v` varchar(780) NOT NULL,
   PRIMARY KEY  (`id`),
-  KEY `rowkey` USING HASH (`rid`,`cid`),
+  KEY `rowkey`  (`rid`,`cid`),
   KEY `cid_locate_i` (`v`(255),`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 
 ####### DROP TABLE IF EXISTS `ac_css`;
@@ -55,9 +58,9 @@ CREATE TABLE  `ac_css` (
   `cid` varchar(64) NOT NULL,
   `v` varchar(780) NOT NULL,
   PRIMARY KEY  (`id`),
-  KEY `rowkey` USING HASH (`rid`,`cid`),
+  KEY `rowkey`  (`rid`,`cid`),
   KEY `cid_locate_i` (`v`(255),`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 
 # Body Store. In some cases we want to store the bodies of the objects in a binary serialized lump
@@ -68,29 +71,29 @@ CREATE TABLE  `ac_css` (
 CREATE TABLE  `css_b` (
   `rid` varchar(32) NOT NULL,
   `b` blob,
-  primary key USING HASH (`rid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  primary key (`rid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 # Central Store for Object bodies, serialized content maps rather than columns
 CREATE TABLE  `cn_css_b` (
   `rid` varchar(32) NOT NULL,
   `b` blob,
-  primary key USING HASH (`rid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  primary key  (`rid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 # Central Store for Object bodies, serialized content maps rather than columns
 CREATE TABLE  `au_css_b` (
   `rid` varchar(32) NOT NULL,
   `b` blob,
-  primary key USING HASH (`rid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  primary key  (`rid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 # Central Store for Object bodies, serialized content maps rather than columns
 CREATE TABLE  `ac_css_b` (
   `rid` varchar(32) NOT NULL,
   `b` blob,
-  primary key USING HASH (`rid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  primary key  (`rid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 
 

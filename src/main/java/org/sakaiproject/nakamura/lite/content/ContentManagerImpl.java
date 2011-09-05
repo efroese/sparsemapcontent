@@ -42,12 +42,15 @@ import static org.sakaiproject.nakamura.lite.content.InternalContent.TRUE;
 import static org.sakaiproject.nakamura.lite.content.InternalContent.VERSION_HISTORY_ID_FIELD;
 import static org.sakaiproject.nakamura.lite.content.InternalContent.VERSION_NUMBER_FIELD;
 
-import com.google.common.collect.ImmutableMap.Builder;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.Configuration;
@@ -67,19 +70,17 @@ import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.lite.util.PreemptiveIterator;
 import org.sakaiproject.nakamura.lite.CachingManager;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
+import org.sakaiproject.nakamura.lite.storage.SparseRow;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * <pre>
@@ -267,7 +268,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 if  (content == null) {
                     // this is over the top as a disposable iterator should close auto
                     childContent.close();
-                    close();
+                    super.close();
                     return false;
                 }
                 return true;
@@ -311,7 +312,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 }
                 LOGGER.debug("No more");
                 childPath = null;
-                close();
+                super.close();
                 return false;
             }
 
@@ -320,6 +321,29 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                 return childPath;
             }
         };
+    }
+    
+    public void triggerRefresh(String path) throws StorageClientException, AccessDeniedException {
+        Content c = get(path);
+        if ( c != null ) {
+            eventListener.onUpdate(Security.ZONE_CONTENT, path, accessControlManager.getCurrentUserId(), false, c.getOriginalProperties(), "op:update");
+        }
+    }
+    
+    public void triggerRefreshAll() throws StorageClientException {
+        if (User.ADMIN_USER.equals(accessControlManager.getCurrentUserId()) ) {
+            DisposableIterator<SparseRow> all = client.listAll(keySpace, contentColumnFamily);
+            try {
+                while(all.hasNext()) {
+                    Map<String, Object> c = all.next().getProperties();
+                    if ( c.containsKey(PATH_FIELD) && !c.containsKey(STRUCTURE_UUID_FIELD)) {
+                        eventListener.onUpdate(Security.ZONE_CONTENT, (String)c.get(PATH_FIELD), User.ADMIN_USER, false, ImmutableMap.copyOf(c), "op:update");                    
+                    }
+                }
+            } finally {
+                all.close();
+            }
+        }
     }
 
     public void update(Content excontent) throws AccessDeniedException, StorageClientException {

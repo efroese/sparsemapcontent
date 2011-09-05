@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.Configuration;
+import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.StoreListener;
@@ -41,6 +42,7 @@ import org.sakaiproject.nakamura.lite.CachingManager;
 import org.sakaiproject.nakamura.lite.accesscontrol.AccessControlManagerImpl;
 import org.sakaiproject.nakamura.lite.accesscontrol.AuthenticatorImpl;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
+import org.sakaiproject.nakamura.lite.storage.SparseRow;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +62,7 @@ import com.google.common.collect.Maps;
  */
 public class AuthorizableManagerImpl extends CachingManager implements AuthorizableManager {
 
+    private static final String DISABLED_PASSWORD_HASH = "--disabled--";
     private static final Set<String> FILTER_ON_UPDATE = ImmutableSet.of(Authorizable.ID_FIELD,
             Authorizable.PASSWORD_FIELD);
     private static final Set<String> FILTER_ON_CREATE = ImmutableSet.of(Authorizable.ID_FIELD,
@@ -74,8 +77,9 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
     private boolean closed;
     private Authenticator authenticator;
     private StoreListener storeListener;
+    private Session session;
 
-    public AuthorizableManagerImpl(User currentUser, StorageClient client,
+    public AuthorizableManagerImpl(User currentUser, Session session, StorageClient client,
             Configuration configuration, AccessControlManagerImpl accessControlManager,
             Map<String, CacheHolder> sharedCache, StoreListener storeListener) throws StorageClientException,
             AccessDeniedException {
@@ -85,6 +89,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             throw new RuntimeException("Current User ID shoud not be null");
         }
         this.thisUser = currentUser;
+        this.session = session;
         this.client = client;
         this.accessControlManager = accessControlManager;
         this.keySpace = configuration.getKeySpace();
@@ -116,9 +121,9 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             return null;
         }
         if (isAUser(authorizableMap)) {
-            return new UserInternal(authorizableMap, false);
+            return new UserInternal(authorizableMap, session, false);
         } else if (isAGroup(authorizableMap)) {
-            return new GroupInternal(authorizableMap, false);
+            return new GroupInternal(authorizableMap, session, false);
         }
         return null;
     }
@@ -132,6 +137,9 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         }
         if ( authorizable.isReadOnly() ) {
             return;
+        }
+        if ( authorizable.isNew() ) {
+            throw new StorageClientException("You must create an authorizable if its new, you cant update an new authorizable");
         }
         accessControlManager.check(Security.ZONE_AUTHORIZABLES, id, Permissions.CAN_WRITE);
         if ( !authorizable.isModified() ) {
@@ -212,6 +220,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                         Map<String, Object> encodedProperties = StorageClientUtils
                                 .getFilteredAndEcodedMap(newMember.getPropertiesForUpdate(),
                                         FILTER_ON_UPDATE);
+                        encodedProperties.put(Authorizable.ID_FIELD, newMember.getId());
                         putCached(keySpace, authorizableColumnFamily, newMember.getId(),
                                 encodedProperties, newMember.isNew());
                         LOGGER.debug("Updated {} with principal {} {} ",new Object[]{newMember.getId(), group.getId(), encodedProperties});
@@ -230,6 +239,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                         Map<String, Object> encodedProperties = StorageClientUtils
                                 .getFilteredAndEcodedMap(retiredMember.getPropertiesForUpdate(),
                                         FILTER_ON_UPDATE);
+                        encodedProperties.put(Authorizable.ID_FIELD, retiredMember.getId());
                         putCached(keySpace, authorizableColumnFamily, retiredMember.getId(),
                                 encodedProperties, retiredMember.isNew());
                         changes++;
@@ -259,6 +269,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                 authorizable.getPropertiesForUpdate(), FILTER_ON_UPDATE);
         encodedProperties.put(Authorizable.LASTMODIFIED_FIELD,System.currentTimeMillis());
         encodedProperties.put(Authorizable.LASTMODIFIED_BY_FIELD,accessControlManager.getCurrentUserId());
+        encodedProperties.put(Authorizable.ID_FIELD, id); // make certain the ID is always there.
         putCached(keySpace, authorizableColumnFamily, id, encodedProperties, authorizable.isNew());
 
         authorizable.reset(getCached(keySpace, authorizableColumnFamily, id));
@@ -283,6 +294,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
     public boolean createAuthorizable(String authorizableId, String authorizableName,
             String password, Map<String, Object> properties) throws AccessDeniedException,
             StorageClientException {
+        checkId(authorizableId);
         if (properties == null) {
           properties = Maps.newHashMap();
         }
@@ -320,6 +332,20 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                 accessControlManager.getCurrentUserId());
         putCached(keySpace, authorizableColumnFamily, authorizableId, encodedProperties, true);
         return true;
+    }
+
+    private void checkId(String authorizableId) throws StorageClientException {
+        if ( authorizableId.charAt(0) == '_') {
+            throw new StorageClientException("Authorizables may not start with _  :"+authorizableId);
+        }
+        for ( int i = 0; i < authorizableId.length(); i++) {
+            int cp = authorizableId.codePointAt(i);
+            if ( Character.isWhitespace(cp) ||
+            Character.isISOControl(cp) ||
+            Character.isMirrored(cp) ) {
+                throw new StorageClientException("Authorizables may not contain :"+authorizableId.charAt(i));
+            }
+        }
     }
 
     public boolean createUser(String authorizableId, String authorizableName, String password,
@@ -387,6 +413,8 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             putCached(keySpace, authorizableColumnFamily, id, ImmutableMap.of(
                     Authorizable.LASTMODIFIED_FIELD,
                     (Object)System.currentTimeMillis(),
+                    Authorizable.ID_FIELD,
+                    id,
                     Authorizable.LASTMODIFIED_BY_FIELD,
                     accessControlManager.getCurrentUserId(),
                     Authorizable.PASSWORD_FIELD,
@@ -435,10 +463,10 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                                     .check(Security.ZONE_AUTHORIZABLES, (String) authMap.get(Authorizable.ID_FIELD),
                                             Permissions.CAN_READ);
                             if (isAUser(authMap)) {
-                                authorizable = new UserInternal(authMap, false);
+                                authorizable = new UserInternal(authMap, session, false);
                                 return true;
                             } else if (isAGroup(authMap))
-                                authorizable = new GroupInternal(authMap, false);
+                                authorizable = new GroupInternal(authMap, session, false);
                             return true;
                         } catch (AccessDeniedException e) {
                             LOGGER.debug("Search result filtered ", e.getMessage());
@@ -499,5 +527,54 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         return LOGGER;
     }
 
+    public void disablePassword(Authorizable authorizable) throws StorageClientException,
+            AccessDeniedException {
+        String id = authorizable.getId();
+
+        if (thisUser.isAdmin()) {
+            putCached(keySpace, authorizableColumnFamily, id, ImmutableMap.of(
+                    Authorizable.LASTMODIFIED_FIELD,
+                    (Object)System.currentTimeMillis(),
+                    Authorizable.ID_FIELD,
+                    id,
+                    Authorizable.LASTMODIFIED_BY_FIELD,
+                    accessControlManager.getCurrentUserId(),
+                    Authorizable.PASSWORD_FIELD,
+                    DISABLED_PASSWORD_HASH), false);
+
+            storeListener.onUpdate(Security.ZONE_AUTHORIZABLES, id, currentUserId, false, null, "op:disable-password");
+
+        } else {
+            throw new AccessDeniedException(Security.ZONE_ADMIN, id,
+                    "Not allowed to disable the password, must be an admin user",
+                    currentUserId);
+        }
+    }
+
+
+    public void triggerRefresh(String id) throws StorageClientException, AccessDeniedException {
+        Authorizable c = findAuthorizable(id);
+        if ( c != null ) {
+            storeListener.onUpdate(Security.ZONE_AUTHORIZABLES, id,
+                    accessControlManager.getCurrentUserId(), false, c.getOriginalProperties(),
+                    new String[] { (c instanceof Group) ? "type:group" : "type:user" });
+        }
+    }
+    
+    public void triggerRefreshAll() throws StorageClientException {
+        if (User.ADMIN_USER.equals(accessControlManager.getCurrentUserId()) ) {
+            DisposableIterator<SparseRow> all = client.listAll(keySpace, authorizableColumnFamily);
+            try {
+                while(all.hasNext()) {
+                    Map<String, Object> c = all.next().getProperties();
+                    if ( c.containsKey(Authorizable.ID_FIELD) ) {
+                        storeListener.onUpdate(Security.ZONE_AUTHORIZABLES, (String)c.get(Authorizable.ID_FIELD), User.ADMIN_USER, false, ImmutableMap.copyOf(c), (String[]) null);                    
+                    }
+                }
+            } finally {
+                all.close(); // not necessary if the wile completes, but if there is an error it might be.
+            }
+        }
+    }
 
 }

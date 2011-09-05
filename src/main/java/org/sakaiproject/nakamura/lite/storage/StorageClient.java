@@ -128,4 +128,22 @@ public interface StorageClient {
      */
     boolean hasBody( Map<String, Object> content, String streamId);
 
+    /**
+     * List all objects of the type
+     * @param keySpace the key space
+     * @param columnFamily
+     * @return a Disposable iterator containing all raw objects of the type in question.
+     * @throws StorageClientException 
+     */
+    DisposableIterator<SparseRow> listAll(String keySpace, String columnFamily) throws StorageClientException;
+
+    /**
+     * Count all the objects in a column Family.
+     * @param keySpace
+     * @param columnFamily
+     * @return the number of objects
+     * @throws StorageClientException 
+     */
+    long allCount(String keySpace, String columnFamily) throws StorageClientException;
+
 }
