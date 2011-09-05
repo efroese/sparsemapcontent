@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
+import org.sakaiproject.nakamura.lite.content.InternalContent;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -30,9 +31,10 @@ public class MongoUtils {
 				setFields.put(key, value);
 			}
 		}
-		// Cannot do a $set modifier on the _id field
-		if (setFields.containsField("_id")){
-			setFields.removeField("_id");
+		// rewrite _id => MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD
+		if (setFields.containsField(MongoClient.MONGO_INTERNAL_ID_FIELD)){
+			setFields.put(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD, setFields.get(MongoClient.MONGO_INTERNAL_ID_FIELD));
+			setFields.removeField(MongoClient.MONGO_INTERNAL_ID_FIELD);
 		}
 		if (setFields.keySet().size() > 0){
 			cleaned.put(Operators.SET, setFields);
@@ -48,8 +50,9 @@ public class MongoUtils {
 	 * @param dbo the object fetched from the DB.
 	 * @return the dbo as a Map.
 	 */
+	@SuppressWarnings("deprecation")
 	public static Map<String,Object> convertDBObjectToMap(DBObject dbo){
-		Map<String,Object> map = null; 
+		Map<String,Object> map = null;
 		if (dbo != null){
 			map = new HashMap<String,Object>();
 			for (String key: dbo.keySet()){
@@ -65,6 +68,16 @@ public class MongoUtils {
 				else {
 					map.put(key, val);
 				}
+			}
+
+			// Delete the Mongo-supplied internal _id
+			if (map.containsKey(MongoClient.MONGO_INTERNAL_ID_FIELD)){
+				map.remove(MongoClient.MONGO_INTERNAL_ID_FIELD);
+			}
+			// Rename the sparse id property to InternalContent.getUuidField() so the rest of sparse can use that property nameield.
+			if (map.containsKey(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD)){
+				map.put(InternalContent.getUuidField(), map.get(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD));
+				map.remove(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD);
 			}
 		}
 		return map;

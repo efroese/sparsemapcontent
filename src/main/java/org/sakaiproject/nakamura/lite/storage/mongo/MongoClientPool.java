@@ -55,8 +55,13 @@ public class MongoClientPool implements StorageClientPool {
 	public static final String PROP_STOREBASE = "mongo.disk.storage.base";
 
 	private static final String[] DEFAULT_INDEXED_KEYS = new String[] {
+		"au:" + MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
 		"au:rep:principalName",
 		"au:type",
+
+		"ac:" + MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
+
+		"cn:" + MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD,
 		"cn:sling:resourceType",
 		"cn:sakai:pooled-content-manager",
 

@@ -18,7 +18,10 @@ import org.sakaiproject.nakamura.lite.content.FileStreamContentHelper;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.content.StreamedContentHelper;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
+import org.sakaiproject.nakamura.lite.storage.Disposer;
 import org.sakaiproject.nakamura.lite.storage.RowHasher;
+import org.sakaiproject.nakamura.lite.storage.SparseMapRow;
+import org.sakaiproject.nakamura.lite.storage.SparseRow;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +36,9 @@ import com.mongodb.DBObject;
 public class MongoClient implements StorageClient, RowHasher {
 
 	private static final Logger log = LoggerFactory.getLogger(MongoClient.class);
+
+	public static final String MONGO_INTERNAL_ID_FIELD = "_id";
+	public static final String MONGO_INTERNAL_SPARSE_UUID_FIELD = "_sparsemapcontent_id";
 
 	private DB mongodb;
 
@@ -119,6 +125,46 @@ public class MongoClient implements StorageClient, RowHasher {
 		collection.remove(query);
 	}
 
+	public DisposableIterator<SparseRow> listAll(String keySpace,
+			String columnFamily) throws StorageClientException {
+		log.info("listAll {}:{}", new Object[]{keySpace, columnFamily});
+		DBCollection collection = mongodb.getCollection(columnFamily);
+
+		final DBCursor cursor = collection.find();
+		final Iterator<DBObject> itr = cursor.iterator();
+
+		return new DisposableIterator<SparseRow>() {
+
+			public boolean hasNext() {
+				return itr.hasNext();
+			}
+
+			public SparseRow next() {
+				DBObject next = (DBObject) itr.next();
+				return new SparseMapRow((String)next.get(MONGO_INTERNAL_SPARSE_UUID_FIELD),
+						MongoUtils.convertDBObjectToMap(next));			}
+
+			public void remove() {
+				// TODO Auto-generated method stub
+			}
+
+			public void close() {
+				cursor.close();
+			}
+
+			public void setDisposer(Disposer disposer) {
+				// TODO Auto-generated method stub
+			}
+		};
+	}
+
+	public long allCount(String keySpace, String columnFamily)
+			throws StorageClientException {
+		log.info("allCount {}:{}", new Object[]{keySpace, columnFamily});
+		DBCollection collection = mongodb.getCollection(columnFamily);
+		return collection.count();
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#streamBodyOut(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.util.Map)
@@ -165,8 +211,8 @@ public class MongoClient implements StorageClient, RowHasher {
 				List<String> searchValues = (List<String>)multiValQueryMap.get(field);
 
 				// This is what mongo expects
-				// mongoQuery = { "$or" : [ BasicDBObject("field", "val0"), 
-				//                             BasicDBObject("field", "val1") ] } 
+				// mongoQuery = { "$or" : [ BasicDBObject("field", "val0"),
+				//                             BasicDBObject("field", "val1") ] }
 				ArrayList<BasicDBObject> mongoQuery = new ArrayList<BasicDBObject>();
 				for(String searchVal: searchValues){
 					mongoQuery.add(new BasicDBObject(field, searchVal));
@@ -190,13 +236,13 @@ public class MongoClient implements StorageClient, RowHasher {
 		}
 
 		// See if we need to sort
-		DBCursor cursor = collection.find(query);
+		final DBCursor cursor = collection.find(query);
 		if (properties.containsKey("_sort")){
 			query.remove("_sort");
 			cursor.sort(new BasicDBObject((String)properties.get("_sort"), 1));
 		}
 
-		final Iterator<?> itr = (Iterator<?>)cursor.iterator();
+		final Iterator<DBObject> itr = cursor.iterator();
 		return new DisposableIterator<Map<String,Object>>() {
 
 			public boolean hasNext() {
@@ -212,6 +258,10 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 
 			public void close() {
+				cursor.close();
+			}
+
+			public void setDisposer(Disposer disposer) {
 				// TODO Auto-generated method stub
 			}
 		};
@@ -266,7 +316,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		} catch (UnsupportedEncodingException e) {
 			ridkey = keystring.getBytes();
 		}
-		String hash = StorageClientUtils.encode(hasher.digest(ridkey)); 
+		String hash = StorageClientUtils.encode(hasher.digest(ridkey));
 		log.info("{}:{}:{} => {}", new Object[]{keySpace, columnFamily, key, hash});
 		return hash;
 	}
