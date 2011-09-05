@@ -212,11 +212,13 @@ public class MongoClient implements StorageClient, RowHasher {
 			throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject query = new BasicDBObject(properties);
+
+		BasicDBObject query = new BasicDBObject();
 
 		// Go through the properties of the query
 		for (String key: properties.keySet()){
 			Object val = properties.get(key);
+			key = MongoUtils.cleanFieldName(key);
 
 			if (val instanceof Map){
 				// This is how it comes from sparse
@@ -247,6 +249,9 @@ public class MongoClient implements StorageClient, RowHasher {
 				mongoSet.put(Operators.ALL, valList);
 				// overwrite the original value of key
 				query.put(key, mongoSet);
+			}
+			else {
+				query.put(key, val);
 			}
 		}
 

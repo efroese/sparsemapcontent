@@ -12,6 +12,8 @@ import com.mongodb.DBObject;
 
 public class MongoUtils {
 
+	public static String MONGO_FIELD_DOT_REPLACEMENT = "&&";
+
 	/**
 	 * Take the properties as given by sparsemap and modify them for insertion into mongo.
 	 * @param props the properties of this content
@@ -23,6 +25,7 @@ public class MongoUtils {
 		DBObject setFields = new BasicDBObject();
 		for(String key : props.keySet()){
 			Object value = props.get(key);
+			key = cleanFieldName(key);
 			// Replace the sparse RemoveProperty with the Mongo $unset.
 			if (value instanceof RemoveProperty){
 				removeFields.put(key, 1);
@@ -52,6 +55,7 @@ public class MongoUtils {
 			map = new HashMap<String,Object>();
 			for (String key: dbo.keySet()){
 				Object val = dbo.get(key);
+				key = key.replace(MONGO_FIELD_DOT_REPLACEMENT, ".");
 				// The rest of sparsemapcontent expects Arrays.
 				// Mongo returns {@link BasicDBList}s no matter what.
 				if (val instanceof BasicDBList){
@@ -76,5 +80,9 @@ public class MongoUtils {
 			}
 		}
 		return map;
+	}
+
+	public static String cleanFieldName(String key) {
+		return key.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT);
 	}
 }
