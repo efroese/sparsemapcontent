@@ -34,11 +34,49 @@ import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 
+/**
+ *
+ * A {@link StorageClient} for SpaeseMapContent that uses MongoDB as a backend.
+ *
+ * For the most part the concepts and objects in SMC and MongoDB are very similar.
+ *
+ * Sparse Map Content => MongoDB
+ *
+ * Column Family      => Collection
+ * Content Object     => Document
+ * Content Property   => Document Field
+ *
+ * Both have one method for saving data. SMC is insert, MongoDB is update.
+ * We use the MongoDB update with the upsert flag set to true so these methods
+ * are equivalent abd we'll just use the term upsert.
+ *
+ * There are some subtle differences do be aware of though.
+ *
+ * 1.Both SMC and MongoDB think they own a property on each object named _id.
+ *
+ * This is not the case. In reality MongoDB owns it. This driver takes pain to
+ * rewrite the _id property on upsert to another key. This way Mongo manages
+ * the _id property in the underlying storage and we don't step on its toes too much.
+ *
+ * 2. MongoDB treats .'s in field names as nested documents
+ *
+ * If you try to store a field on x with the name a.b and value 1 in MongoDB,
+ * you will actually store:
+ * x.a = { b : 1 }
+ *
+ * This driver changes .'s in field names to some obscure constant string before it
+ * upserts. When reading data out of Mongo we change it back to . so noone knows our
+ * little secret. shh. This is a bit of a hack.
+ *
+ */
 public class MongoClient implements StorageClient, RowHasher {
 
 	private static final Logger log = LoggerFactory.getLogger(MongoClient.class);
 
+	// This belongs to MongoDB. Never set this field.
 	public static final String MONGO_INTERNAL_ID_FIELD = "_id";
+
+	// This primary id as far as SMC is concerned
 	public static final String MONGO_INTERNAL_SPARSE_UUID_FIELD = "_sparsemapcontent_id";
 
 	private DB mongodb;
@@ -59,10 +97,6 @@ public class MongoClient implements StorageClient, RowHasher {
 		this.streamedContentHelper = new FileStreamContentHelper(this, props);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#get(java.lang.String, java.lang.String, java.lang.String)
-	 */
 	public Map<String, Object> get(String keySpace, String columnFamily,
 			String key) throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
@@ -73,6 +107,8 @@ public class MongoClient implements StorageClient, RowHasher {
 		BasicDBObject query = new BasicDBObject();
 		query.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
 		DBCursor cursor = collection.find(query);
+
+		// Check the result and return it.
 		Map<String,Object> result = null;
 		if (cursor.size() == 1){
 			result = MongoUtils.convertDBObjectToMap(cursor.next());
@@ -83,10 +119,6 @@ public class MongoClient implements StorageClient, RowHasher {
 		return result;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#insert(java.lang.String, java.lang.String, java.lang.String, java.util.Map, boolean)
-	 */
 	public void insert(String keySpace, String columnFamily, String key,
 			Map<String, Object> values, boolean probablyNew)
 	throws StorageClientException {
@@ -100,7 +132,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			mutableValues.remove(MongoClient.MONGO_INTERNAL_ID_FIELD);
 		}
 
-		// Set the parent path hash if this is a piece of content
+		// Set the parent path hash if this is a piece of content that is not a root (roots are orphans)
 		if (mutableValues.keySet().contains(InternalContent.PATH_FIELD) && !StorageClientUtils.isRoot(key)) {
 			mutableValues.put(InternalContent.PARENT_HASH_FIELD,
 					rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
@@ -122,26 +154,19 @@ public class MongoClient implements StorageClient, RowHasher {
 		log.debug("insert {}:{}:{} => {}", new Object[] {keySpace, columnFamily, key, insert.toString()});
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#remove(java.lang.String, java.lang.String, java.lang.String)
-	 */
 	public void remove(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
-		log.debug("remove {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
-		BasicDBObject query = new BasicDBObject();
-		query.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
-		collection.remove(query);
+		collection.remove(new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key));
+		log.debug("remove {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 	}
 
 	public DisposableIterator<SparseRow> listAll(String keySpace,
 			String columnFamily) throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
-
-		log.debug("listAll {}:{}", new Object[]{keySpace, columnFamily});
 		DBCollection collection = mongodb.getCollection(columnFamily);
+		log.debug("listAll {}:{}", new Object[]{keySpace, columnFamily});
 
 		final DBCursor cursor = collection.find();
 		final Iterator<DBObject> itr = cursor.iterator();
@@ -155,14 +180,13 @@ public class MongoClient implements StorageClient, RowHasher {
 			public SparseRow next() {
 				DBObject next = itr.next();
 				return new SparseMapRow((String)next.get(MONGO_INTERNAL_SPARSE_UUID_FIELD),
-						MongoUtils.convertDBObjectToMap(next));			}
-
-			public void remove() { }
+						MongoUtils.convertDBObjectToMap(next));
+			}
 
 			public void close() {
 				cursor.close();
 			}
-
+			public void remove() { }
 			public void setDisposer(Disposer disposer) { }
 		};
 	}
@@ -175,10 +199,6 @@ public class MongoClient implements StorageClient, RowHasher {
 		return collection.count();
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#streamBodyOut(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.util.Map)
-	 */
 	public InputStream streamBodyOut(String keySpace, String columnFamily,
 			String contentId, String contentBlockId, String streamId,
 			Map<String, Object> content) throws StorageClientException,
@@ -187,10 +207,6 @@ public class MongoClient implements StorageClient, RowHasher {
 		return streamedContentHelper.readBody(keySpace, columnFamily, contentBlockId, streamId, content);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#streamBodyIn(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.util.Map, java.io.InputStream)
-	 */
 	public Map<String, Object> streamBodyIn(String keySpace,
 			String columnFamily, String contentId, String contentBlockId,
 			String streamId, Map<String, Object> content, InputStream in)
@@ -200,23 +216,19 @@ public class MongoClient implements StorageClient, RowHasher {
 		return meta;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#find(java.lang.String, java.lang.String, java.util.Map)
-	 */
+
 	@SuppressWarnings("unchecked")
 	public DisposableIterator<Map<String, Object>> find(String keySpace,
 			String columnFamily, Map<String, Object> properties)
 			throws StorageClientException {
+
 		columnFamily = columnFamily.toLowerCase();
 		DBCollection collection = mongodb.getCollection(columnFamily);
-
 		BasicDBObject query = new BasicDBObject();
 
-		// Go through the properties of the query
 		for (String key: properties.keySet()){
 			Object val = properties.get(key);
-			key = MongoUtils.cleanFieldName(key);
+			key = MongoUtils.escapeFieldName(key);
 
 			if (val instanceof Map){
 				// This is how it comes from sparse
@@ -253,6 +265,11 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 		}
 
+		/*
+		 * Support the custom count queries.
+		 * TODO: A better way to define custom queries dynamically.
+		 * Maybe a list of JSON queries and use mongodo.eval(...)?
+		 */
 		String customStatementSet = query.getString(StorageConstants.CUSTOM_STATEMENT_SET);
 		if (customStatementSet != null && "countestimate".equals(customStatementSet)){
 			query.remove(StorageConstants.CUSTOM_STATEMENT_SET);
@@ -274,9 +291,8 @@ public class MongoClient implements StorageClient, RowHasher {
 				public Map<String, Object> next() {
 					return ImmutableMap.of("1", (Object)new Integer(count));
 				}
-
 				public void remove() { }
-				public void close() { }
+				public void close() { /* no cursor to close */ }
 				public void setDisposer(Disposer disposer) { }
 			};
 		}
@@ -289,6 +305,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 			final Iterator<DBObject> itr = cursor.iterator();
 
+			// Iterator with the results.
 			return new DisposableIterator<Map<String,Object>>() {
 				public boolean hasNext() {
 					return itr.hasNext();
@@ -299,47 +316,35 @@ public class MongoClient implements StorageClient, RowHasher {
 				public void close() {
 					cursor.close();
 				}
-
 				public void remove() { }
 				public void setDisposer(Disposer disposer) { }
 			};
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#close()
-	 */
 	public void close() {
 		log.debug("Closed");
 		this.mongodb.requestDone();
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#listChildren(java.lang.String, java.lang.String, java.lang.String)
-	 */
 	public DisposableIterator<Map<String, Object>> listChildren(
 			String keySpace, String columnFamily, String key)
 			throws StorageClientException {
 		columnFamily = columnFamily.toLowerCase();
-		// this will load all child object directly.
+		// Hash the object we're considering
 		String hash = rowHash(keySpace, columnFamily, key);
 		log.debug("Finding {}:{}:{} as {} ", new Object[]{keySpace,columnFamily, key, hash});
+		// Issue a query for anyone who lists that hash as their parent.
 		return find(keySpace, columnFamily, ImmutableMap.of(InternalContent.PARENT_HASH_FIELD, (Object)hash));
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.StorageClient#hasBody(java.util.Map, java.lang.String)
-	 */
 	public boolean hasBody(Map<String, Object> content, String streamId) {
+		// Is there a binary stream of data for this object with this streamId?
 		return streamedContentHelper.hasStream(content, streamId);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.sakaiproject.nakamura.lite.storage.RowHasher#rowHash(java.lang.String, java.lang.String, java.lang.String)
+	/**
+	 * Generate the row id hashes needed to maintain ids and relationships in sparse.
 	 */
 	public String rowHash(String keySpace, String columnFamily, String key)
 	throws StorageClientException {
