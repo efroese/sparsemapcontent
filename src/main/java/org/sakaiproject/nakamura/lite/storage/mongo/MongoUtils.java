@@ -12,7 +12,17 @@ import com.mongodb.DBObject;
 
 public class MongoUtils {
 
-	public static String MONGO_FIELD_DOT_REPLACEMENT = "&#46;";
+	/*
+	 * MongoDB does not allow . and $ in a field name.
+	 * http://www.mongodb.org/display/DOCS/Legal+Key+Names
+	 *
+	 * Noone should be able to type this into the UX and hopefully the UX devs are
+	 * not going to pick this as a chaaratcer in their field names not allow users to
+	 * create arbitrary fields.
+	 *
+	 */
+	public static String MONGO_FIELD_DOT_REPLACEMENT = "¦";
+	public static String MONGO_FIELD_DOLLAR_REPLACEMENT = "¤";
 
 	/**
 	 * Take the properties as given by sparsemap and modify them for insertion into mongo.
@@ -22,7 +32,9 @@ public class MongoUtils {
 	public static DBObject cleanPropertiesForInsert(Map<String, Object> props) {
 		DBObject cleaned = new BasicDBObject();
 		DBObject removeFields = new BasicDBObject();
-		DBObject setFields = new BasicDBObject();
+		DBObject updatedFields = new BasicDBObject();
+
+		// Partition the properties into update and remove ops
 		for(String key : props.keySet()){
 			Object value = props.get(key);
 			key = escapeFieldName(key);
@@ -31,11 +43,11 @@ public class MongoUtils {
 				removeFields.put(key, 1);
 			}
 			else if (value != null){
-				setFields.put(key, value);
+				updatedFields.put(key, value);
 			}
 		}
-		if (setFields.keySet().size() > 0){
-			cleaned.put(Operators.SET, setFields);
+		if (updatedFields.keySet().size() > 0){
+			cleaned.put(Operators.SET, updatedFields);
 		}
 		if (removeFields.keySet().size() > 0){
 			cleaned.put(Operators.UNSET, removeFields);
@@ -82,11 +94,23 @@ public class MongoUtils {
 		return map;
 	}
 
+	/**
+	 * Create a key that's safe to use as a field name in MongoDB
+	 * @param key the SMC property key
+	 * @return the MongoDB field name
+	 */
 	public static String escapeFieldName(String key) {
-		return key.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT);
+		return key.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT)
+					.replaceAll("$", MONGO_FIELD_DOLLAR_REPLACEMENT);
 	}
 
-	public static String unescapeFieldName(String key) {
-		return key.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".");
+	/**
+	 * Transform the MongoDB document field name into a SMC property key.
+	 * @param fieldName the name of the field in the MongoDB document.
+	 * @return the property key in SMC
+	 */
+	public static String unescapeFieldName(String fieldName) {
+		return fieldName.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".")
+					.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, "$");
 	}
 }
