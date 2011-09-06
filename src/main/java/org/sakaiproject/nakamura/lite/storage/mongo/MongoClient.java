@@ -33,6 +33,7 @@ import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
+import com.mongodb.MongoException;
 
 /**
  *
@@ -90,10 +91,14 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		String user = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), MongoClientPool.PROP_MONGO_USER);
 		String password = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), MongoClientPool.PROP_MONGO_USER);
-		if (!"".equals(user) && !"".equals(password)){
-			this.mongodb.authenticate("admin", "admin".toCharArray());
+		if (!this.mongodb.isAuthenticated() && !"".equals(user) && !"".equals(password)){
+			if (this.mongodb.authenticate("admin", "admin".toCharArray())){
+				this.mongodb.requestStart();
+			}
+			else {
+				throw new MongoException("Unable to authenticate");
+			}
 		}
-		this.mongodb.requestStart();
 		this.streamedContentHelper = new FileStreamContentHelper(this, props);
 	}
 
