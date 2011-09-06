@@ -6,13 +6,13 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
+import org.apache.felix.scr.annotations.Modified;
 import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.apache.felix.scr.annotations.ReferencePolicy;
 import org.apache.felix.scr.annotations.Service;
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageCacheManager;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.lite.storage.ConcurrentLRUMap;
@@ -43,7 +43,7 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_MONGO_DB)
 	public static final String PROP_MONGO_DB = "mongo.db";
 
-	private static final String DEFAULT_MONGO_USER = "";
+	private static final String DEFAULT_MONGO_USER = "nakamura";
 	@Property(value = DEFAULT_MONGO_USER)
 	public static final String PROP_MONGO_USER = "mongo.user";
 
@@ -51,41 +51,15 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_MONGO_PASSWORD)
 	public static final String PROP_MONGO_PASSWORD = "mongo.password";
 
-	private static final String DEFAULT_STOREBASE = "store";
+	private static final String DEFAULT_STOREBASE = "content_bodies";
 	@Property(value = DEFAULT_STOREBASE)
-	public static final String PROP_STOREBASE = "mongo.disk.storage.base";
+	public static final String PROP_STOREBASE = "mongo.gridfs.bucket";
 
-	private static final String[] DEFAULT_INDEXED_KEYS = new String[] {
-		"au:rep:principalName",
-		"au:type",
-		"au:_:parenthash",
-
-		"ac:_:parenthash",
-
-		"cn:_created",
-		"cn:_:parenthash",
-		"cn:firstName",
-		"cn:lastName",
-
-		"cn:sakai:category",
-		"cn:sakai:contactstorepath",
-		"cn:sakai:from",
-		"cn:sakai:marker",
-		"cn:sakai:messagebox",
-		"cn:sakai:messagestore",
-		"cn:sakai:pooled-content-manager",
-		"cn:sling:resourceType",
-		"cn:sakai:state",
-		"cn:sakai:subject",
-		"cn:sakai:tag-uuid",
-		"cn:sakai:type",
-
-	};
-	@Property
-	public static final String PROP_INDEXED_COLS = "mongo.indexed.keys";
-
-	@Reference(cardinality=ReferenceCardinality.OPTIONAL_UNARY, policy=ReferencePolicy.DYNAMIC)
+	//@Reference(cardinality=ReferenceCardinality.OPTIONAL_UNARY, policy=ReferencePolicy.DYNAMIC)
 	private StorageCacheManager storageManagerCache;
+
+	@Reference
+	private Configuration sparseConfiguration;
 
 	private Map<String,Object> props;
 
@@ -94,10 +68,12 @@ public class MongoClientPool implements StorageClientPool {
 	private StorageCacheManager defaultStorageManagerCache;
 
 	@Activate
+	@Modified
 	public void activate(Map<String,Object> props) throws MongoException, UnknownHostException {
+		this.props = props;
 		this.mongo = new Mongo(new MongoURI(StorageClientUtils.getSetting(props.get(PROP_MONGO_URI), DEFAULT_MONGO_URI)));
 		this.db = mongo.getDB(StorageClientUtils.getSetting(props.get(PROP_MONGO_DB), DEFAULT_MONGO_DB));
-		this.props = props;
+
 
 		this.sharedCache = new ConcurrentLRUMap<String, CacheHolder>(10000);
 		// this is a default cache used where none has been provided.
@@ -122,12 +98,14 @@ public class MongoClientPool implements StorageClientPool {
 		}
 
 		DBCollection collection;
-		String[] keysToIndex = StorageClientUtils.getSetting(props.get(PROP_INDEXED_COLS), DEFAULT_INDEXED_KEYS);
-		for (String toIndex: keysToIndex){
-			String columnFamily = StringUtils.substringBefore(toIndex, ":");
-			String keyName = StringUtils.substringAfter(toIndex, ":");
-			collection = db.getCollection(columnFamily);
-			collection.ensureIndex(new BasicDBObject(keyName, 1), keyName + "_index", false);
+
+		for (String toIndex: sparseConfiguration.getIndexColumnNames()){
+			String columnFamily = StringUtils.trimToNull(StringUtils.substringBefore(toIndex, ":"));
+			String keyName = StringUtils.trimToNull(StringUtils.substringAfter(toIndex, ":"));
+			if (columnFamily != null && keyName != null){
+				collection = db.getCollection(columnFamily);
+				collection.ensureIndex(new BasicDBObject(keyName, 1), keyName + "_index", false);
+			}
 		}
 	}
 
