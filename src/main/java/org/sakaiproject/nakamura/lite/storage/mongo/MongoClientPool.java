@@ -30,8 +30,6 @@ import com.mongodb.MongoURI;
 @Service
 public class MongoClientPool implements StorageClientPool {
 
-	public static final String[] SPARSE_COLLECTION_NAMES = { "au", "ac", "cn" };
-
 	protected Mongo mongo;
 	protected DB db;
 
@@ -55,11 +53,13 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_STOREBASE)
 	public static final String PROP_STOREBASE = "mongo.gridfs.bucket";
 
+	private String[] SPARSE_COLLECTION_NAMES;
+
 	//@Reference(cardinality=ReferenceCardinality.OPTIONAL_UNARY, policy=ReferencePolicy.DYNAMIC)
 	private StorageCacheManager storageManagerCache;
 
 	@Reference
-	private Configuration sparseConfiguration;
+	private Configuration configuration;
 
 	private Map<String,Object> props;
 
@@ -73,7 +73,6 @@ public class MongoClientPool implements StorageClientPool {
 		this.props = props;
 		this.mongo = new Mongo(new MongoURI(StorageClientUtils.getSetting(props.get(PROP_MONGO_URI), DEFAULT_MONGO_URI)));
 		this.db = mongo.getDB(StorageClientUtils.getSetting(props.get(PROP_MONGO_DB), DEFAULT_MONGO_DB));
-
 
 		this.sharedCache = new ConcurrentLRUMap<String, CacheHolder>(10000);
 		// this is a default cache used where none has been provided.
@@ -89,6 +88,12 @@ public class MongoClientPool implements StorageClientPool {
             }
         };
 
+        SPARSE_COLLECTION_NAMES = new String[] {
+        		configuration.getAuthorizableColumnFamily(),
+        		configuration.getAclColumnFamily(),
+        		configuration.getContentColumnFamily()
+        };
+
 		for (String name: SPARSE_COLLECTION_NAMES){
 			if (!db.collectionExists(name)){
 				DBCollection collection = db.createCollection(name, null);
@@ -99,7 +104,7 @@ public class MongoClientPool implements StorageClientPool {
 
 		DBCollection collection;
 
-		for (String toIndex: sparseConfiguration.getIndexColumnNames()){
+		for (String toIndex: configuration.getIndexColumnNames()){
 			String columnFamily = StringUtils.trimToNull(StringUtils.substringBefore(toIndex, ":"));
 			String keyName = StringUtils.trimToNull(StringUtils.substringAfter(toIndex, ":"));
 			if (columnFamily != null && keyName != null){
@@ -123,4 +128,7 @@ public class MongoClientPool implements StorageClientPool {
         return defaultStorageManagerCache;
     }
 
+	public void bindConfiguration(Configuration configuration) {
+		this.configuration = configuration;
+	}
 }

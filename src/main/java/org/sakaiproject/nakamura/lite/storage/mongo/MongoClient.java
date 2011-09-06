@@ -100,6 +100,7 @@ public class MongoClient implements StorageClient, RowHasher {
 			}
 		}
 		this.streamedContentHelper = new FileStreamContentHelper(this, props);
+		this.mongodb.requestStart();
 	}
 
 	public Map<String, Object> get(String keySpace, String columnFamily,

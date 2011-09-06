@@ -90,6 +90,7 @@ public class CreateUsersAndGroupsWithMembersSoak extends AbstractSoakController 
     protected static StorageClientPool getClientPool(Configuration configuration) throws ClassNotFoundException {
     	MongoClientPool clientPool = new MongoClientPool();
         try {
+        	clientPool.bindConfiguration(configuration);
 			clientPool
 			        .activate(ImmutableMap
 			                .of(MongoClientPool.PROP_MONGO_URI, (Object) "mongodb://127.0.0.1",
