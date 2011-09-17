@@ -15,7 +15,6 @@ import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.StorageConstants;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
-import org.sakaiproject.nakamura.lite.content.FileStreamContentHelper;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.content.StreamedContentHelper;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
@@ -83,7 +82,6 @@ public class MongoClient implements StorageClient, RowHasher {
 	private DB mongodb;
 
 	// Reads and Writes file content to a filesystem.
-	// TODO: Replace this with a GridFS helper.
 	private StreamedContentHelper streamedContentHelper;
 
 	public MongoClient(DB mongodb, Map<String,Object> props) {
@@ -100,7 +98,7 @@ public class MongoClient implements StorageClient, RowHasher {
 				throw new MongoException("Unable to authenticate");
 			}
 		}
-		this.streamedContentHelper = new FileStreamContentHelper(this, props);
+		this.streamedContentHelper = new GridFSContentHelper(mongodb, this, props);
 		this.mongodb.requestStart();
 	}
 

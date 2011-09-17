@@ -49,9 +49,9 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_MONGO_PASSWORD)
 	public static final String PROP_MONGO_PASSWORD = "mongo.password";
 
-	private static final String DEFAULT_STOREBASE = "content_bodies";
-	@Property(value = DEFAULT_STOREBASE)
-	public static final String PROP_STOREBASE = "mongo.gridfs.bucket";
+	private static final String DEFAULT_BUCKET = "smc_content_bodies";
+	@Property(value = DEFAULT_BUCKET)
+	public static final String PROP_BUCKET = "mongo.gridfs.bucket";
 
 	private String[] SPARSE_COLLECTION_NAMES;
 
