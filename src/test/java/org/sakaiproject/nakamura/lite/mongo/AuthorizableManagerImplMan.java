@@ -26,7 +26,7 @@ public class AuthorizableManagerImplMan extends AbstractAuthorizableManagerImplT
     @Override
     protected StorageClientPool getClientPool(Configuration configuration)
 	throws ClassNotFoundException {
-        return MongoSetup.getClientPool();
+        return MongoSetup.getClientPool(configuration);
     }
 
 }

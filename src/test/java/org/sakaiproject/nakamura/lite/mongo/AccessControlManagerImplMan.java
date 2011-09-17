@@ -26,7 +26,7 @@ public class AccessControlManagerImplMan extends AbstractAccessControlManagerImp
 	@Override
 	protected StorageClientPool getClientPool(Configuration configuration)
 			throws ClassNotFoundException {
-		return MongoSetup.getClientPool();
+		return MongoSetup.getClientPool(configuration);
 	}
 
 }

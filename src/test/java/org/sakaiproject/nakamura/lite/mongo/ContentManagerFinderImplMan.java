@@ -26,7 +26,7 @@ public class ContentManagerFinderImplMan extends AbstractContentManagerFinderTes
     @Override
     protected StorageClientPool getClientPool(Configuration configuration)
 	throws ClassNotFoundException {
-        return MongoSetup.getClientPool();
+        return MongoSetup.getClientPool(configuration);
     }
 
 }
