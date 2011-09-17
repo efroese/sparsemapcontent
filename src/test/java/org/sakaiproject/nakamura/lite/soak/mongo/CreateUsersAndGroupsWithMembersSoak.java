@@ -93,7 +93,7 @@ public class CreateUsersAndGroupsWithMembersSoak extends AbstractSoakController 
         	clientPool.bindConfiguration(configuration);
 			clientPool
 			        .activate(ImmutableMap
-			                .of(MongoClientPool.PROP_MONGO_URI, (Object) "mongodb://127.0.0.1",
+			                .of(MongoClientPool.PROP_MONGO_URI, (Object) "mongodb://127.0.0.1/?maxpoolsize=1000",
 			                	MongoClientPool.PROP_MONGO_DB, (Object) "smc_soaktests"));
 		} catch (Exception e) {
 			throw new RuntimeException(e.getMessage(), e);
