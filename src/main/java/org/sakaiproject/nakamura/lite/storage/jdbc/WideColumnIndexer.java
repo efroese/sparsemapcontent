@@ -22,7 +22,6 @@ import org.sakaiproject.nakamura.api.lite.util.PreemptiveIterator;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
 import org.sakaiproject.nakamura.lite.storage.Disposer;
-import org.sakaiproject.nakamura.lite.storage.jdbc.JDBCStorageClient.SlowQueryLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +95,8 @@ public class WideColumnIndexer extends AbstractIndexer {
                 }
             }
             
-            if (!StorageClientUtils.isRoot(key)) {
+            if (!StorageClientUtils.isRoot(key) 
+                    && getColumnName(keySpace, columnFamily, InternalContent.PARENT_HASH_FIELD) != null) {
                 String parent = StorageClientUtils.getParentObjectPath(key);
                 String hash = client.rowHash(keySpace, columnFamily, parent);
                 LOGGER.debug("Hash of {}:{}:{} is {} ", new Object[] { keySpace, columnFamily,
@@ -180,7 +180,7 @@ public class WideColumnIndexer extends AbstractIndexer {
                 }
                 for (String toRemove : removeColumns) {
                     join(setOperations," ,").append(MessageFormat.format(sqlParts[1],
-                            indexColumnsNames.get(columnFamily + ":" + toRemove)));
+                            getColumnName(keySpace, columnFamily, toRemove)));
                 }
                 String finalSql = MessageFormat.format(sqlParts[0], setOperations);
                 LOGGER.debug("Performing {} ",finalSql);
