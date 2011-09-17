@@ -191,6 +191,7 @@ public class MongoClient implements StorageClient, RowHasher {
 
 			public void close() {
 				cursor.close();
+				mongodb.requestDone();
 			}
 			public void remove() { }
 			public void setDisposer(Disposer disposer) { }
@@ -298,7 +299,7 @@ public class MongoClient implements StorageClient, RowHasher {
 					return ImmutableMap.of("1", (Object)new Integer(count));
 				}
 				public void remove() { }
-				public void close() { /* no cursor to close */ }
+				public void close() { mongodb.requestDone(); }
 				public void setDisposer(Disposer disposer) { }
 			};
 		}
@@ -321,6 +322,7 @@ public class MongoClient implements StorageClient, RowHasher {
 				}
 				public void close() {
 					cursor.close();
+					mongodb.requestDone();
 				}
 				public void remove() { }
 				public void setDisposer(Disposer disposer) { }
