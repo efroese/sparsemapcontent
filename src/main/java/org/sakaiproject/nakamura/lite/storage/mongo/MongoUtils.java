@@ -100,8 +100,12 @@ public class MongoUtils {
 	 * @return the MongoDB field name
 	 */
 	public static String escapeFieldName(String key) {
-		return key.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT)
-					.replaceAll("$", MONGO_FIELD_DOLLAR_REPLACEMENT);
+		if (key == null){
+			return null;
+		}
+		key = key.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT);
+		key = key.replaceAll("\\$", MONGO_FIELD_DOLLAR_REPLACEMENT);
+		return key;
 	}
 
 	/**
@@ -110,7 +114,11 @@ public class MongoUtils {
 	 * @return the property key in SMC
 	 */
 	public static String unescapeFieldName(String fieldName) {
-		return fieldName.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".")
-					.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, "$");
+		if (fieldName == null){
+			return null;
+		}
+		fieldName = fieldName.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".");
+		fieldName = fieldName.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, "\\$");
+		return fieldName;
 	}
 }

@@ -19,6 +19,7 @@ package org.sakaiproject.nakamura.lite.mongo;
 
 import java.net.UnknownHostException;
 
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.lite.storage.mongo.MongoClientPool;
 
 import com.google.common.collect.ImmutableMap;
@@ -26,11 +27,11 @@ import com.mongodb.MongoException;
 
 public class MongoSetup {
 
-    private static MongoClientPool clientPool = createClientPool();
 
-    public synchronized static MongoClientPool createClientPool() {
+    public synchronized static MongoClientPool createClientPool(Configuration configuration) {
         try {
         	MongoClientPool connectionPool = new MongoClientPool();
+        	connectionPool.bindConfiguration(configuration);
             connectionPool
                     .activate(ImmutableMap
                             .of(MongoClientPool.PROP_MONGO_URI, (Object) "mongodb://127.0.0.1",
@@ -45,7 +46,7 @@ public class MongoSetup {
 		}
     }
 
-    public static MongoClientPool getClientPool() {
-        return clientPool;
+    public static MongoClientPool getClientPool(Configuration configuration) {
+        return createClientPool(configuration);
     }
 }
