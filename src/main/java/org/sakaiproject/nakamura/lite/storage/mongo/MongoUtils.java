@@ -1,5 +1,7 @@
 package org.sakaiproject.nakamura.lite.storage.mongo;
 
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,8 +23,8 @@ public class MongoUtils {
 	 * create arbitrary fields.
 	 *
 	 */
-	public static String MONGO_FIELD_DOT_REPLACEMENT = "¦";
-	public static String MONGO_FIELD_DOLLAR_REPLACEMENT = "¤";
+	public static final String MONGO_FIELD_DOT_REPLACEMENT = "¦";
+	public static final String MONGO_FIELD_DOLLAR_REPLACEMENT = "¤";
 
 	/**
 	 * Take the properties as given by sparsemap and modify them for insertion into mongo.
@@ -35,16 +37,22 @@ public class MongoUtils {
 		DBObject updatedFields = new BasicDBObject();
 
 		// Partition the properties into update and remove ops
-		for(String key : props.keySet()){
+		for (String key : props.keySet()){
 			Object value = props.get(key);
 			key = escapeFieldName(key);
 			// Replace the sparse RemoveProperty with the Mongo $unset.
 			if (value instanceof RemoveProperty){
 				removeFields.put(key, 1);
 			}
-			else if (value != null){
+			else if (value instanceof Calendar || value instanceof GregorianCalendar){
+				 updatedFields.put(key, ((Calendar)value).getTime());
+			}
+			else if (value != null) {
 				updatedFields.put(key, value);
 			}
+		}
+		if (updatedFields.containsField(MongoClient.MONGO_INTERNAL_ID_FIELD)){
+			updatedFields.removeField(MongoClient.MONGO_INTERNAL_ID_FIELD);
 		}
 		if (updatedFields.keySet().size() > 0){
 			cleaned.put(Operators.SET, updatedFields);
@@ -62,34 +70,34 @@ public class MongoUtils {
 	 */
 	@SuppressWarnings("deprecation")
 	public static Map<String,Object> convertDBObjectToMap(DBObject dbo){
-		Map<String,Object> map = null;
-		if (dbo != null){
-			map = new HashMap<String,Object>();
-			for (String key: dbo.keySet()){
-				Object val = dbo.get(key);
-				key = unescapeFieldName(key);
-				// The rest of sparsemapcontent expects Arrays.
-				// Mongo returns {@link BasicDBList}s no matter what.
-				if (val instanceof BasicDBList){
-					BasicDBList dbl = (BasicDBList) val;
-					// Not really happy about using a String[] here
-					// but it makes more tests pass in the ContentManagerFinderImplMan case.
-					map.put(key, dbl.toArray(new String[0]));
-				}
-				else {
-					map.put(key, val);
-				}
+		if (dbo == null){
+			return null;
+		}
+		Map<String,Object> map = new HashMap<String,Object>();
+		for (String key: dbo.keySet()){
+			Object val = dbo.get(key);
+			key = unescapeFieldName(key);
+			// The rest of sparsemapcontent expects Arrays.
+			// Mongo returns {@link BasicDBList}s no matter what.
+			if (val instanceof BasicDBList){
+				BasicDBList dbl = (BasicDBList) val;
+				// Not really happy about using a String[] here
+				// but it makes more tests pass in the ContentManagerFinderImplMan case.
+				map.put(key, dbl.toArray(new String[0]));
 			}
+			else {
+				map.put(key, val);
+			}
+		}
 
-			// Delete the Mongo-supplied internal _id
-			if (map.containsKey(MongoClient.MONGO_INTERNAL_ID_FIELD)){
-				map.remove(MongoClient.MONGO_INTERNAL_ID_FIELD);
-			}
-			// Rename the sparse id property to InternalContent.getUuidField() so the rest of sparse can use that property nameield.
-			if (map.containsKey(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD)){
-				map.put(InternalContent.getUuidField(), map.get(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD));
-				map.remove(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD);
-			}
+		// Delete the Mongo-supplied internal _id
+		if (map.containsKey(MongoClient.MONGO_INTERNAL_ID_FIELD)){
+			map.remove(MongoClient.MONGO_INTERNAL_ID_FIELD);
+		}
+		// Rename the sparse id property to InternalContent.getUuidField() so the rest of sparse can use that property nameield.
+		if (map.containsKey(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD)){
+			map.put(InternalContent.getUuidField(), map.get(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD));
+			map.remove(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD);
 		}
 		return map;
 	}
