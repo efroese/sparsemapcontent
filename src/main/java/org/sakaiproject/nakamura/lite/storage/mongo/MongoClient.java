@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.StorageConstants;
@@ -77,7 +78,7 @@ public class MongoClient implements StorageClient, RowHasher {
 	public static final String MONGO_INTERNAL_ID_FIELD = "_id";
 
 	// This primary id as far as SMC is concerned
-	public static final String MONGO_INTERNAL_SPARSE_UUID_FIELD = "_sparsemapcontent_id";
+	public static final String MONGO_INTERNAL_SPARSE_UUID_FIELD = Repository.SYSTEM_PROP_PREFIX + "smcid";
 
 	private DB mongodb;
 
