@@ -33,7 +33,7 @@ public class MongoClientPool implements StorageClientPool {
 	protected Mongo mongo;
 	protected DB db;
 
-	private static final String DEFAULT_MONGO_URI = "mongodb://127.0.0.1";
+	private static final String DEFAULT_MONGO_URI = "mongodb://127.0.0.1/?maxpoolsize=1000";
 	@Property(value = DEFAULT_MONGO_URI)
 	public static final String PROP_MONGO_URI = "mongo.uri";
 
