@@ -4,6 +4,7 @@ import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
 
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
@@ -23,8 +24,8 @@ public class MongoUtils {
 	 * create arbitrary fields.
 	 *
 	 */
-	public static final String MONGO_FIELD_DOT_REPLACEMENT = "¦";
-	public static final String MONGO_FIELD_DOLLAR_REPLACEMENT = "¤";
+	public static final String MONGO_FIELD_DOT_REPLACEMENT = "\u00B6";
+	public static final String MONGO_FIELD_DOLLAR_REPLACEMENT = "\u00A7";
 
 	/**
 	 * Take the properties as given by sparsemap and modify them for insertion into mongo.
@@ -104,16 +105,16 @@ public class MongoUtils {
 
 	/**
 	 * Create a key that's safe to use as a field name in MongoDB
-	 * @param key the SMC property key
+	 * @param fieldName the SMC property key
 	 * @return the MongoDB field name
 	 */
-	public static String escapeFieldName(String key) {
-		if (key == null){
+	public static String escapeFieldName(String fieldName) {
+		if (fieldName == null){
 			return null;
 		}
-		key = key.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT);
-		key = key.replaceAll("\\$", MONGO_FIELD_DOLLAR_REPLACEMENT);
-		return key;
+		fieldName = fieldName.replaceAll("\\.", MONGO_FIELD_DOT_REPLACEMENT);
+		fieldName = fieldName.replaceAll("\\$", MONGO_FIELD_DOLLAR_REPLACEMENT);
+		return fieldName;
 	}
 
 	/**
@@ -126,7 +127,7 @@ public class MongoUtils {
 			return null;
 		}
 		fieldName = fieldName.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".");
-		fieldName = fieldName.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, "\\$");
+		fieldName = fieldName.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, Matcher.quoteReplacement("$"));
 		return fieldName;
 	}
 }

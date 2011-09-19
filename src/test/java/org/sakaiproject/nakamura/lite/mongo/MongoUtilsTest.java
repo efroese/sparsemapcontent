@@ -19,8 +19,8 @@ import com.mongodb.DBObject;
 
 public class MongoUtilsTest extends TestCase {
 	
-	private String fieldName = "dots.and$_x";
-	private String escaped = "dots" + MongoUtils.MONGO_FIELD_DOT_REPLACEMENT + "and" 
+	private static final String fieldName = "dots.and$_x";
+	private static final String escaped = "dots" + MongoUtils.MONGO_FIELD_DOT_REPLACEMENT + "and"
 									+ MongoUtils.MONGO_FIELD_DOLLAR_REPLACEMENT + "_x";
 	
 	@Test
