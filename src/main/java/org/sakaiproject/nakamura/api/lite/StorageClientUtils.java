@@ -475,11 +475,11 @@ public class StorageClientUtils {
      * @param <T>
      * @param setting
      * @param defaultValue
-     * @return gets a setting of type <T> usign the default value if null.
+     * @return gets a setting of type <T> using the default value if null.
      */
     @SuppressWarnings("unchecked")
     public static <T> T getSetting(Object setting, T defaultValue) {
-        if (setting != null) {
+        if (setting != null && defaultValue != null) {
             if (defaultValue.getClass().isAssignableFrom(setting.getClass())) {
                 return (T) setting;
             }
