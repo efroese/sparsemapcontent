@@ -92,7 +92,7 @@ public class MongoClient implements StorageClient, RowHasher {
 		String password = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), null);
 
 		if (!this.mongodb.isAuthenticated() && user != null && password != null){
-			if (this.mongodb.authenticate("admin", "admin".toCharArray())){
+			if (this.mongodb.authenticate(user, password.toCharArray())){
 				this.mongodb.requestStart();
 			}
 			else {
