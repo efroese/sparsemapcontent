@@ -152,7 +152,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                                                                         Content.getUuidField(),
                                                                         PATH_FIELD);
 
-	private static final Set<String> VERSIONHISTORY_PRIVATE_PROPERTIES = ImmutableSet.of(Content.getUuidField());
+	private static final Set<String> VERSIONHISTORY_PRIVATE_PROPERTIES = ImmutableSet.of("id", "_id");
 
 
     /**
