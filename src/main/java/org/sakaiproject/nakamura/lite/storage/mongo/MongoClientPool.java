@@ -100,7 +100,8 @@ public class MongoClientPool implements StorageClientPool {
 		// index _aclKey on ac
 		collection = db.createCollection(configuration.getAclColumnFamily(), null);
 		collection.ensureIndex(new BasicDBObject(AccessControlManagerImpl._KEY, 1),
-				MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD + "_index", true);
+								AccessControlManagerImpl._KEY + "_index",
+								false);
 
 		// Apply the other indexes
 		for (String toIndex: configuration.getIndexColumnNames()){
