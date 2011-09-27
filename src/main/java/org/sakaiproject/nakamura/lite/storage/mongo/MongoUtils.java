@@ -95,7 +95,8 @@ public class MongoUtils {
 		if (map.containsKey(MongoClient.MONGO_INTERNAL_ID_FIELD)){
 			map.remove(MongoClient.MONGO_INTERNAL_ID_FIELD);
 		}
-		// Rename the sparse id property to InternalContent.getUuidField() so the rest of sparse can use that property nameield.
+		// Rename the sparse id property to InternalContent.getUuidField() so the rest of sparse can use that field name.
+		// _smcid -> _id
 		if (map.containsKey(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD)){
 			map.put(InternalContent.getUuidField(), map.get(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD));
 			map.remove(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD);

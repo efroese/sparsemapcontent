@@ -16,6 +16,7 @@ import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.StorageConstants;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
+import org.sakaiproject.nakamura.lite.accesscontrol.AccessControlManagerImpl;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.content.StreamedContentHelper;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
@@ -82,11 +83,14 @@ public class MongoClient implements StorageClient, RowHasher {
 
 	private DB mongodb;
 
+	private Map<String,Object> props;
+
 	// Reads and Writes file content to a filesystem.
 	private StreamedContentHelper streamedContentHelper;
 
 	public MongoClient(DB mongodb, Map<String,Object> props) {
 		this.mongodb = mongodb;
+		this.props = props;
 
 		String user = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER),  null);
 		String password = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), null);
@@ -110,8 +114,13 @@ public class MongoClient implements StorageClient, RowHasher {
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
 		// Pretty straightforward. Just query by the id.
-		BasicDBObject query = new BasicDBObject();
-		query.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
+		DBObject query = null;
+		if (columnFamily.equals((String)props.get(MongoClientPool.PROP_ACL_COLLECTION))) {
+			query = new BasicDBObject(AccessControlManagerImpl._KEY, key);
+		}
+		else {
+			query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
+		}
 		DBCursor cursor = collection.find(query);
 
 		// Check the result and return it.
@@ -144,13 +153,17 @@ public class MongoClient implements StorageClient, RowHasher {
 					rowHash(keySpace, columnFamily, StorageClientUtils.getParentObjectPath(key)));
 		}
 
-		// Set the primary sparsemapcontent id
-		mutableValues.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
-
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
-		// The document to update identified is by _sparsemapcontent_id
-		DBObject query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
+		// The document to update identified its _smcid or _aclKey
+		DBObject query = null;
+		if (columnFamily.equals((String)props.get(MongoClientPool.PROP_ACL_COLLECTION))) {
+			query = new BasicDBObject(AccessControlManagerImpl._KEY, key);
+		}
+		else {
+			query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
+			mutableValues.put(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
+		}
 
 		// Converts the insert into a bunch of set, unset Mongo operations
 		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);

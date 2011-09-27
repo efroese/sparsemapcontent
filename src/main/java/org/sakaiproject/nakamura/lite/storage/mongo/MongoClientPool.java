@@ -1,6 +1,7 @@
 package org.sakaiproject.nakamura.lite.storage.mongo;
 
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
@@ -15,6 +16,7 @@ import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageCacheManager;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.lite.accesscontrol.AccessControlManagerImpl;
 import org.sakaiproject.nakamura.lite.storage.ConcurrentLRUMap;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
@@ -53,9 +55,10 @@ public class MongoClientPool implements StorageClientPool {
 	@Property(value = DEFAULT_BUCKET)
 	public static final String PROP_BUCKET = "mongo.gridfs.bucket";
 
-	private String[] SPARSE_COLLECTION_NAMES;
+	public static final String PROP_AUTHORIZABLE_COLLECTION = "au";
+	public static final String PROP_ACL_COLLECTION = "ac";
+	public static final String PROP_CONTENT_COLLECTION = "cn";
 
-	//@Reference(cardinality=ReferenceCardinality.OPTIONAL_UNARY, policy=ReferencePolicy.DYNAMIC)
 	private StorageCacheManager storageManagerCache;
 
 	@Reference
@@ -70,31 +73,21 @@ public class MongoClientPool implements StorageClientPool {
 	@Activate
 	@Modified
 	public void activate(Map<String,Object> props) throws MongoException, UnknownHostException {
-		this.props = props;
+		this.props = new HashMap<String, Object>(props);
 		this.mongo = new Mongo(new MongoURI(StorageClientUtils.getSetting(props.get(PROP_MONGO_URI), DEFAULT_MONGO_URI)));
 		this.db = mongo.getDB(StorageClientUtils.getSetting(props.get(PROP_MONGO_DB), DEFAULT_MONGO_DB));
 
-		this.sharedCache = new ConcurrentLRUMap<String, CacheHolder>(10000);
-		// this is a default cache used where none has been provided.
-        defaultStorageManagerCache = new StorageCacheManager() {
-            public Map<String, CacheHolder> getContentCache() {
-                return sharedCache;
-            }
-            public Map<String, CacheHolder> getAuthorizableCache() {
-                return sharedCache;
-            }
-            public Map<String, CacheHolder> getAccessControlCache() {
-                return sharedCache;
-            }
-        };
+        this.props.put(PROP_AUTHORIZABLE_COLLECTION, configuration.getAuthorizableColumnFamily());
+        this.props.put(PROP_ACL_COLLECTION, configuration.getAclColumnFamily());
+        this.props.put(PROP_CONTENT_COLLECTION, configuration.getContentColumnFamily());
 
-        SPARSE_COLLECTION_NAMES = new String[] {
-        		configuration.getAuthorizableColumnFamily(),
-        		configuration.getAclColumnFamily(),
-        		configuration.getContentColumnFamily()
-        };
+        initCache();
+        initIndexes();
+	}
 
-		for (String name: SPARSE_COLLECTION_NAMES){
+	private void initIndexes() {
+		// index _smcid on au and cn
+		for (String name: new String[] {configuration.getContentColumnFamily(), configuration.getAuthorizableColumnFamily() }){
 			if (!db.collectionExists(name)){
 				DBCollection collection = db.createCollection(name, null);
 				collection.ensureIndex(new BasicDBObject(MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD, 1),
@@ -104,6 +97,12 @@ public class MongoClientPool implements StorageClientPool {
 
 		DBCollection collection;
 
+		// index _aclKey on ac
+		collection = db.createCollection(configuration.getAclColumnFamily(), null);
+		collection.ensureIndex(new BasicDBObject(AccessControlManagerImpl._KEY, 1),
+				MongoClient.MONGO_INTERNAL_SPARSE_UUID_FIELD + "_index", true);
+
+		// Apply the other indexes
 		for (String toIndex: configuration.getIndexColumnNames()){
 			String columnFamily = StringUtils.trimToNull(StringUtils.substringBefore(toIndex, ":"));
 			String keyName = StringUtils.trimToNull(StringUtils.substringAfter(toIndex, ":"));
@@ -112,6 +111,22 @@ public class MongoClientPool implements StorageClientPool {
 				collection.ensureIndex(new BasicDBObject(keyName, 1), keyName + "_index", false);
 			}
 		}
+	}
+
+	private void initCache() {
+		this.sharedCache = new ConcurrentLRUMap<String, CacheHolder>(10000);
+		// this is a default cache used where none has been provided.
+        this.defaultStorageManagerCache = new StorageCacheManager() {
+			public Map<String, CacheHolder> getContentCache() {
+                return sharedCache;
+            }
+			public Map<String, CacheHolder> getAuthorizableCache() {
+                return sharedCache;
+            }
+			public Map<String, CacheHolder> getAccessControlCache() {
+                return sharedCache;
+            }
+        };
 	}
 
 	public StorageClient getClient() throws ClientPoolException {
