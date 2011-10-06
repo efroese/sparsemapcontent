@@ -25,6 +25,7 @@ import org.sakaiproject.nakamura.lite.storage.RowHasher;
 import org.sakaiproject.nakamura.lite.storage.SparseMapRow;
 import org.sakaiproject.nakamura.lite.storage.SparseRow;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
+import org.sakaiproject.nakamura.lite.storage.StorageClientListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +88,8 @@ public class MongoClient implements StorageClient, RowHasher {
 
 	// Reads and Writes file content to a filesystem.
 	private StreamedContentHelper streamedContentHelper;
+
+	private StorageClientListener storageClientListener;
 
 	public MongoClient(DB mongodb, Map<String,Object> props) {
 		this.mongodb = mongodb;
@@ -167,10 +170,15 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		// Converts the insert into a bunch of set, unset Mongo operations
 		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);
+		
+		Map<String,Object> mapBefore = this.get(keySpace, columnFamily, key);
+		storageClientListener.before(keySpace, columnFamily, key, mapBefore);
 
 		// Update or insert a single document.
 		collection.update(query, insert, true, false);
 		log.debug("insert {}:{}:{} => {}", new Object[] {keySpace, columnFamily, key, insert.toString()});
+		
+		storageClientListener.after(keySpace, columnFamily, key, mutableValues);
 	}
 
 	public void remove(String keySpace, String columnFamily, String key)
@@ -386,5 +394,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		String hash = StorageClientUtils.encode(hasher.digest(ridkey));
 		log.debug("rowHash: {}:{}:{} => {}", new Object[]{keySpace, columnFamily, key, hash});
 		return hash;
+	}
+
+	public void setStorageClientListener(
+			StorageClientListener storageClientListener) {
+		this.storageClientListener = storageClientListener;
 	}
 }
