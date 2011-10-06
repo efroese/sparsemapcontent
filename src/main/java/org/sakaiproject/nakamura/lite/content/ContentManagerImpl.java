@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Sakai Foundation (SF) under one
  * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.google.common.collect.Ordering;
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
@@ -229,7 +230,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         if (structure != null && structure.size() > 0) {
             String contentId = (String)structure.get(STRUCTURE_UUID_FIELD);
             Map<String, Object> content = getCached(keySpace, contentColumnFamily, contentId);
-            if (content != null && content.size() > 0) {
+            if (content != null && content.size() > 0 && !TRUE.equals(content.get(DELETED_FIELD))) {
                 Content contentObject = new Content(path, content);
                 ((InternalContent) contentObject).internalize(this, false);
                 return contentObject;
@@ -443,8 +444,6 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
             Map<String, Object> content = getCached(keySpace, contentColumnFamily, uuid);
             Map<String, Object> contentBeforeDelete = ImmutableMap.copyOf(content);
             String resourceType = (String) content.get("sling:resourceType");
-            removeFromCache(keySpace, contentColumnFamily, path);
-            client.remove(keySpace, contentColumnFamily, path);
             putCached(keySpace, contentColumnFamily, uuid,
                     ImmutableMap.of(DELETED_FIELD, (Object) TRUE), false);
             if (resourceType != null) {
@@ -638,8 +637,7 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
         putCached(keySpace, contentColumnFamily, to, fromStructure, true);
 
         // remove the old from.
-        removeFromCache(keySpace, contentColumnFamily, from);
-        client.remove(keySpace, contentColumnFamily, from);
+        removeCached(keySpace, contentColumnFamily, from);
         eventListener.onDelete(Security.ZONE_CONTENT, from, accessControlManager.getCurrentUserId(), null, "op:move");
         eventListener.onUpdate(Security.ZONE_CONTENT, to, accessControlManager.getCurrentUserId(), true, null, "op:move");
 
@@ -780,19 +778,19 @@ public class ContentManagerImpl extends CachingManager implements ContentManager
                     final Map<String, Object> versionHistory = getCached(keySpace,contentColumnFamily, versionHistoryId);
                     LOGGER.debug("Loaded Version History  {} {} ", versionHistoryId, versionHistory);
                     versionHistory.remove(InternalContent.getUuidField());
-                    return Lists.sortedCopy(versionHistory.keySet(), new Comparator<String>() {
+                    return Ordering.from(new Comparator<String>() {
                         public int compare(String o1, String o2) {
-                            long l1 = (Long) versionHistory.get(o1);
-                            long l2 = (Long) versionHistory.get(o2);
-                            long r = l2 - l1;
-                            if (r == 0) {
-                                return 0;
-                            } else if (r < 0) {
-                                return -1;
-                            }
-                            return 1;
+                          long l1 = (Long) versionHistory.get(o1);
+                          long l2 = (Long) versionHistory.get(o2);
+                          long r = l2 - l1;
+                          if (r == 0) {
+                            return 0;
+                          } else if (r < 0) {
+                            return -1;
+                          }
+                          return 1;
                         }
-                    });
+                      }).sortedCopy(versionHistory.keySet());
                 }
             }
         }

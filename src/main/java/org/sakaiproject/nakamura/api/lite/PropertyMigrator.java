@@ -34,6 +34,12 @@ import java.util.Map;
 public interface PropertyMigrator {
 
     /**
+     * Option: If set to "true" in the option set then the PropertyMigrator will
+     * only run once, else, the PropertyMigrator will run whenever its present.
+     */
+    public static final String OPTION_RUNONCE = "runonce";
+
+    /**
      * @param rid
      *            the row id of the current object as loaded from the store. If
      *            the property representing the key for the type of object is
@@ -47,5 +53,28 @@ public interface PropertyMigrator {
      *         otherwise.
      */
     boolean migrate(String rid, Map<String, Object> properties);
+
+    /**
+     * @return get a list of dependencies that this PropertyMigrator is
+     *         dependent on. If the named dependencies have not already been run
+     *         or are missing from the current set, then the migration will
+     *         refuse to run. The value of each element of getDependencies()
+     *         should match the value of getName() of the implementation of this
+     *         interface on which there is a dependency.
+     */
+    String[] getDependencies();
+
+    /**
+     * @return get the name of this dependency, which is used in
+     *         getDependencies(). It must be globally unique over all
+     *         implementations of PropertyMigrator. ie getClass().getName() is a
+     *         reasonable choice.
+     */
+    String getName();
+
+    /**
+     * @return get a map of options for the migrator.
+     */
+    Map<String, String> getOptions();
 
 }

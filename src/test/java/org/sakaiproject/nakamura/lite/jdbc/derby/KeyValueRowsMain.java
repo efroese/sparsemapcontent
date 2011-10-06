@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Sakai Foundation (SF) under one
+ * or more contributor license agreements. See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership. The SF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
 package org.sakaiproject.nakamura.lite.jdbc.derby;
 
 import java.io.File;
@@ -23,6 +40,7 @@ public class KeyValueRowsMain {
     private String[] dictionary;
 
     public KeyValueRowsMain() {
+        System.err.println(this.getClass().getName());
     }
 
     public void deleteDb(String file) {
@@ -87,11 +105,13 @@ public class KeyValueRowsMain {
                     }
                 }
 
-                if (i % 100 == 0) {
-                    long ct = System.currentTimeMillis();
-                    System.err.println("Commit " + i + " " + (ct - cs) + " ms/100");
-                    cs = ct;
+                if (i % 500 == 0) {
                     connection.commit();
+                    long ct = System.currentTimeMillis();
+                    System.err.print(""+i+","+(ct-cs)+",");
+                    testSelect(2, 0, columns, 5000, true);
+                    cs = System.currentTimeMillis();
+
                 }
             }
         } finally {
@@ -116,7 +136,7 @@ public class KeyValueRowsMain {
         connection.close();
     }
 
-    public void testSelect(int ncols, int sorts, int columns, long timeToLive) throws SQLException {
+    public void testSelect(int ncols, int sorts, int columns, long timeToLive, boolean csv) throws SQLException {
         StringBuilder sb = new StringBuilder();
         SecureRandom sr = new SecureRandom();
         Set<Integer> used = new LinkedHashSet<Integer>();
@@ -170,7 +190,9 @@ public class KeyValueRowsMain {
             }
             sb.append("s").append(sorts - 1).append(".v ");
         }
-        System.err.println(sb.toString());
+        if ( !csv) {
+            System.err.println(sb.toString());
+        }
         PreparedStatement p = null;
         ResultSet rs = null;
         long atstart = System.currentTimeMillis();
@@ -217,8 +239,12 @@ public class KeyValueRowsMain {
         }
         double t = System.currentTimeMillis() - atstart;
         double a = t / nq;
-        System.err.println("Found " + arows + " in " + t + "ms executed " + nq + " queries");
-        System.err.println("Average " + (arows / nq) + " in " + a + "ms");
+        if ( csv ) {
+            System.err.println("" + (arows / nq) + "," + a );
+        } else {
+            System.err.println("Found " + arows + " in " + t + "ms executed " + nq + " queries");
+            System.err.println("Average " + (arows / nq) + " in " + a + "ms");
+        }
 
     }
 
@@ -232,7 +258,7 @@ public class KeyValueRowsMain {
         if (!exists) {
             tmr.createTables(30);
         }
-        tmr.populateDictionary(1000);
+        tmr.populateDictionary(20);
         tmr.loadTable(30, 10000);
         tmr.testSelect(1, 0, 30, 5000);
         tmr.testSelect(2, 0, 30, 5000);
@@ -250,6 +276,9 @@ public class KeyValueRowsMain {
         tmr.testSelect(4, 2, 30, 5000);
         tmr.testSelect(5, 2, 30, 5000);
         tmr.close();
+    }
+    private void testSelect(int i, int j, int k, int l) throws SQLException {
+        testSelect(i, j, k, l, false);
     }
 
 }

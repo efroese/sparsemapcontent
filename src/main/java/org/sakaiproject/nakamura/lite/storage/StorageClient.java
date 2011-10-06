@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Sakai Foundation (SF) under one
  * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
@@ -145,5 +145,7 @@ public interface StorageClient {
      * @throws StorageClientException 
      */
     long allCount(String keySpace, String columnFamily) throws StorageClientException;
+
+    void setStorageClientListener(StorageClientListener storageClientListener);
 
 }

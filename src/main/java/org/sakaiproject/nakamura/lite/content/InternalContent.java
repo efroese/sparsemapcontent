@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Sakai Foundation (SF) under one
  * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
@@ -33,6 +33,7 @@ import org.sakaiproject.nakamura.lite.ConfigurationImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -256,11 +257,11 @@ public class InternalContent {
 
     /**
      * Convert a new content object to an internal version.
-     * 
-     * @param structure
-     *            the structure object
+     *
      * @param contentManager
      *            the content manager now managing this content object.
+     *
+     * @param readOnly sets this contentManager to be either read-only or not.
      */
     void internalize(ContentManagerImpl contentManager, boolean readOnly) {
         this.contentManager = contentManager;
@@ -374,7 +375,7 @@ public class InternalContent {
         }
         return o;
     }
-    
+
     public String getId() {
         return (String) content.get(Content.getUuidField());
     }
@@ -402,7 +403,7 @@ public class InternalContent {
      */
     public Iterable<Content> listChildren() {
         if (newcontent) {
-            return Iterables.emptyIterable();
+            return Collections.<Content>emptyList();
         }
         return new Iterable<Content>() {
 
@@ -422,7 +423,7 @@ public class InternalContent {
      */
     public Iterable<String> listChildPaths() {
         if (newcontent) {
-            return Iterables.emptyIterable();
+            return Collections.<String>emptyList();
         }
         return new Iterable<String>() {
 
@@ -462,16 +463,18 @@ public class InternalContent {
      * @deprecated This method sets the ID field for the whole system. Do not
      *             use. Its been provided to make it possible to configure the
      *             ID field name used by Sparse to allow Berkley to continue
-     *             running without migration. DO NOT USE, IT WILL HAVE NO EFFECT.
+     *             running without migration. DO NOT USE, IT WILL HAVE NO
+     *             EFFECT.
      * @param idFieldName
      */
     public static void setUuidField(String idFieldName) {
-        if ( !idFieldIsSet  ) {
+        if (!idFieldIsSet) {
             idFieldIsSet = true;
-            LOGGER.warn("ID Field is being set to {}, this can only be done once per JVM start ",idFieldName);
+            LOGGER.warn("ID Field is being set to {}, this can only be done once per JVM start ",
+                    idFieldName);
             UUID_FIELD = idFieldName;
         } else {
-            LOGGER.warn("ID Field has already been set to {} and cannot be reset. ",idFieldName);
+            LOGGER.warn("ID Field has already been set to {} and cannot be reset. ", idFieldName);
         }
     }
 
@@ -486,6 +489,19 @@ public class InternalContent {
      */
     public static String getUuidField() {
         return UUID_FIELD;
+    }
+
+    /**
+     * 
+     * @return true if the content item is deleted, the system does not delete
+     *         content items, it marks items as deleted. This will allow the
+     *         storage layers to maintain an update pattern that is close to
+     *         append only allowing compression of the storage to be
+     *         achieved by background task which may then also remove holes in the storage.
+     *         This is not dissimilar from the way most file systems work.
+     */
+    public boolean isDeleted() {
+        return TRUE.equals(content.get(DELETED_FIELD));
     }
 
 }
