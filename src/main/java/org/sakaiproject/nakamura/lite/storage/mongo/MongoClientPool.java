@@ -21,6 +21,8 @@ import org.sakaiproject.nakamura.lite.storage.ConcurrentLRUMap;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -59,6 +61,9 @@ public class MongoClientPool implements StorageClientPool {
 	public static final String PROP_ACL_COLLECTION = "ac";
 	public static final String PROP_CONTENT_COLLECTION = "cn";
 
+	public static final String PROP_ALT_KEYS = "mongo.alternate.keys";
+	public static final String[] DEFAULT_ALT_KEYS = new String[] { "ac:" + AccessControlManagerImpl._KEY , };
+
 	private StorageCacheManager storageManagerCache;
 
 	@Reference
@@ -80,6 +85,14 @@ public class MongoClientPool implements StorageClientPool {
         this.props.put(PROP_AUTHORIZABLE_COLLECTION, configuration.getAuthorizableColumnFamily());
         this.props.put(PROP_ACL_COLLECTION, configuration.getAclColumnFamily());
         this.props.put(PROP_CONTENT_COLLECTION, configuration.getContentColumnFamily());
+        
+        Builder<String,String> altKeyBuilder = new ImmutableMap.Builder<String,String>();
+        String[] altKeyConfigs = StorageClientUtils.getSetting(props.get(PROP_ALT_KEYS), DEFAULT_ALT_KEYS);
+        for (String altKey : altKeyConfigs){
+        	String[] spl = StringUtils.split(altKey, ":");
+        	altKeyBuilder.put(spl[0], spl[1]);
+        }
+        this.props.put(PROP_ALT_KEYS, altKeyBuilder.build());
 
         initCache();
         initIndexes();
@@ -144,7 +157,7 @@ public class MongoClientPool implements StorageClientPool {
         return defaultStorageManagerCache;
     }
 
-	public void bindConfiguration(Configuration configuration) {
-		this.configuration = configuration;
-	}
+    public void bindConfiguration(Configuration configuration) {
+        this.configuration = configuration;
+    }
 }

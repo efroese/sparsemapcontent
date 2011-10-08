@@ -16,7 +16,6 @@ import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.StorageConstants;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
-import org.sakaiproject.nakamura.lite.accesscontrol.AccessControlManagerImpl;
 import org.sakaiproject.nakamura.lite.content.InternalContent;
 import org.sakaiproject.nakamura.lite.content.StreamedContentHelper;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
@@ -79,21 +78,25 @@ public class MongoClient implements StorageClient, RowHasher {
 	// This belongs to MongoDB. Never set this field.
 	public static final String MONGO_INTERNAL_ID_FIELD = "_id";
 
-	// This primary id as far as SMC is concerned
+	// This primary id as far as SMC is concerned 
+	// unless there iss an entry in alternatKeys for this columnFamily
 	public static final String MONGO_INTERNAL_SPARSE_UUID_FIELD = Repository.SYSTEM_PROP_PREFIX + "smcid";
 
+	// Connection to MongoDB
 	private DB mongodb;
 
-	private Map<String,Object> props;
+	// SMC may use something other than _id as its key
+	private Map<String,String> alternateKeys;
 
-	// Reads and Writes file content to a filesystem.
+	// Reads and Writes file content to a filesystem
 	private StreamedContentHelper streamedContentHelper;
 
+	// Throws events for the migration framework
 	private StorageClientListener storageClientListener;
 
+	@SuppressWarnings("unchecked")
 	public MongoClient(DB mongodb, Map<String,Object> props) {
 		this.mongodb = mongodb;
-		this.props = props;
 
 		String user = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER),  null);
 		String password = StorageClientUtils.getSetting(props.get(MongoClientPool.PROP_MONGO_USER), null);
@@ -106,6 +109,7 @@ public class MongoClient implements StorageClient, RowHasher {
 				throw new MongoException("Unable to authenticate");
 			}
 		}
+		this.alternateKeys = (Map<String,String>)props.get(MongoClientPool.PROP_ALT_KEYS);
 		this.streamedContentHelper = new GridFSContentHelper(mongodb, this, props);
 		this.mongodb.requestStart();
 	}
@@ -116,10 +120,10 @@ public class MongoClient implements StorageClient, RowHasher {
 		log.debug("get {}:{}:{}", new Object[]{keySpace, columnFamily, key});
 		DBCollection collection = mongodb.getCollection(columnFamily);
 
-		// Pretty straightforward. Just query by the id.
 		DBObject query = null;
-		if (columnFamily.equals((String)props.get(MongoClientPool.PROP_ACL_COLLECTION))) {
-			query = new BasicDBObject(AccessControlManagerImpl._KEY, key);
+		if (alternateKeys.containsKey(columnFamily)) {
+			String altKey = alternateKeys.get(columnFamily);
+			query = new BasicDBObject(altKey, key);
 		}
 		else {
 			query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
@@ -160,8 +164,11 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		// The document to update identified its _smcid or _aclKey
 		DBObject query = null;
-		if (columnFamily.equals((String)props.get(MongoClientPool.PROP_ACL_COLLECTION))) {
-			query = new BasicDBObject(AccessControlManagerImpl._KEY, key);
+
+		if (alternateKeys.containsKey(columnFamily)) {
+			String altKey = alternateKeys.get(columnFamily);
+			query = new BasicDBObject(altKey, key);
+			mutableValues.put(altKey, key);
 		}
 		else {
 			query = new BasicDBObject(MONGO_INTERNAL_SPARSE_UUID_FIELD, key);
@@ -170,15 +177,19 @@ public class MongoClient implements StorageClient, RowHasher {
 
 		// Converts the insert into a bunch of set, unset Mongo operations
 		DBObject insert = MongoUtils.cleanPropertiesForInsert(mutableValues);
-		
+
 		Map<String,Object> mapBefore = this.get(keySpace, columnFamily, key);
-		storageClientListener.before(keySpace, columnFamily, key, mapBefore);
+		if ( storageClientListener != null ) {
+			storageClientListener.before(keySpace, columnFamily, key, mapBefore);
+		}
 
 		// Update or insert a single document.
 		collection.update(query, insert, true, false);
 		log.debug("insert {}:{}:{} => {}", new Object[] {keySpace, columnFamily, key, insert.toString()});
-		
-		storageClientListener.after(keySpace, columnFamily, key, mutableValues);
+
+		if ( storageClientListener != null ) {
+			storageClientListener.after(keySpace, columnFamily, key, mutableValues);
+		}
 	}
 
 	public void remove(String keySpace, String columnFamily, String key)
