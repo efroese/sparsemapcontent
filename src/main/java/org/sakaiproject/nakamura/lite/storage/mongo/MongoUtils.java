@@ -1,9 +1,14 @@
 package org.sakaiproject.nakamura.lite.storage.mongo;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
@@ -47,11 +52,16 @@ public class MongoUtils {
 			}
 			else if (value instanceof Calendar || value instanceof GregorianCalendar){
 				 updatedFields.put(key, ((Calendar)value).getTime());
+				 updatedFields.put(getTimezoneFieldName(key), ((Calendar)value).getTimeZone().getID());
+			}
+			else if (value instanceof BigDecimal){
+				 updatedFields.put(key, ((BigDecimal)value).doubleValue());
 			}
 			else if (value != null) {
 				updatedFields.put(key, value);
 			}
 		}
+		// Remove the _smcid field so we dont change it.
 		if (updatedFields.containsField(MongoClient.MONGO_INTERNAL_ID_FIELD)){
 			updatedFields.removeField(MongoClient.MONGO_INTERNAL_ID_FIELD);
 		}
@@ -74,6 +84,7 @@ public class MongoUtils {
 		if (dbo == null){
 			return null;
 		}
+		List<String> toRemove = new ArrayList<String>();
 		Map<String,Object> map = new HashMap<String,Object>();
 		for (String key: dbo.keySet()){
 			Object val = dbo.get(key);
@@ -86,9 +97,26 @@ public class MongoUtils {
 				// but it makes more tests pass in the ContentManagerFinderImplMan case.
 				map.put(key, dbl.toArray(new String[0]));
 			}
+			else if (val instanceof Date){
+				Calendar cal = new GregorianCalendar();
+				cal.setTime((Date)val);
+				String tzField = getTimezoneFieldName(key);
+				// Was this date stored as a Calendar? 
+				// If so we'll have a secondary field _:field:timezone that holds
+				// the timezone id.
+				if (dbo.keySet().contains(tzField)){
+					toRemove.add(tzField);
+					cal.setTimeZone(TimeZone.getTimeZone((String)dbo.get(tzField)));
+				}
+				map.put(key, cal);
+			}
 			else {
 				map.put(key, val);
 			}
+		}
+		// Remove keys
+		for (String key: toRemove){
+			map.remove(key);
 		}
 
 		// Delete the Mongo-supplied internal _id
@@ -130,5 +158,9 @@ public class MongoUtils {
 		fieldName = fieldName.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".");
 		fieldName = fieldName.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, Matcher.quoteReplacement("$"));
 		return fieldName;
+	}
+
+	private static String getTimezoneFieldName(String calendarFieldname){
+		return InternalContent.INTERNAL_FIELD_PREFIX + calendarFieldname + ":timezone";
 	}
 }
