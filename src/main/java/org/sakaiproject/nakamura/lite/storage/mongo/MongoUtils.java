@@ -32,6 +32,8 @@ public class MongoUtils {
 	public static final String MONGO_FIELD_DOT_REPLACEMENT = "\u00B6";
 	public static final String MONGO_FIELD_DOLLAR_REPLACEMENT = "\u00A7";
 
+	public static final String BIGDECIMAL_ASSTRING = InternalContent.INTERNAL_FIELD_PREFIX + "BigDecimal:asString:";
+
 	/**
 	 * Take the properties as given by sparsemap and modify them for insertion into mongo.
 	 * @param props the properties of this content
@@ -55,7 +57,7 @@ public class MongoUtils {
 				 updatedFields.put(getTimezoneFieldName(key), ((Calendar)value).getTimeZone().getID());
 			}
 			else if (value instanceof BigDecimal){
-				 updatedFields.put(key, ((BigDecimal)value).doubleValue());
+				 updatedFields.put(getBigDecimalAsStringFieldName(key), ((BigDecimal)value).toString());
 			}
 			else if (value != null) {
 				updatedFields.put(key, value);
@@ -110,6 +112,12 @@ public class MongoUtils {
 				}
 				map.put(key, cal);
 			}
+			// Convert serialized BigDecimal values back to BigDecimal
+			else if (key.startsWith(BIGDECIMAL_ASSTRING)){
+				String bdKey = key.substring(BIGDECIMAL_ASSTRING.length() + 1);
+				map.put(bdKey, new BigDecimal((String)val));
+				toRemove.add(key);
+			}
 			else {
 				map.put(key, val);
 			}
@@ -162,5 +170,9 @@ public class MongoUtils {
 
 	private static String getTimezoneFieldName(String calendarFieldname){
 		return InternalContent.INTERNAL_FIELD_PREFIX + calendarFieldname + ":timezone";
+	}
+
+	private static String getBigDecimalAsStringFieldName(String fieldname){
+		return BIGDECIMAL_ASSTRING + fieldname;
 	}
 }
