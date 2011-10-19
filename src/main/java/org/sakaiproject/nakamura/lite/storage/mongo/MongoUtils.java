@@ -32,7 +32,12 @@ public class MongoUtils {
 	public static final String MONGO_FIELD_DOT_REPLACEMENT = "\u00B6";
 	public static final String MONGO_FIELD_DOLLAR_REPLACEMENT = "\u00A7";
 
-	public static final String BIGDECIMAL_ASSTRING = InternalContent.INTERNAL_FIELD_PREFIX + "BigDecimal:asString:";
+	// _:mongo:
+	public static final String MONGO_INTERNAL_FIELD_PREFIX = InternalContent.INTERNAL_FIELD_PREFIX + "mongo:";
+	// _:mongo:bd:
+	public static final String MONGO_BIGDECIMAL_FIELD_PREFIX = MONGO_INTERNAL_FIELD_PREFIX + "bd:";
+	// _:mongo:tz:
+	public static final String MONGO_TIMEZONE_FIELD_PREFIX = MONGO_INTERNAL_FIELD_PREFIX + "tz:";
 
 	/**
 	 * Take the properties as given by sparsemap and modify them for insertion into mongo.
@@ -54,10 +59,10 @@ public class MongoUtils {
 			}
 			else if (value instanceof Calendar || value instanceof GregorianCalendar){
 				 updatedFields.put(key, ((Calendar)value).getTime());
-				 updatedFields.put(getTimezoneFieldName(key), ((Calendar)value).getTimeZone().getID());
+				 updatedFields.put(MONGO_TIMEZONE_FIELD_PREFIX + key, ((Calendar)value).getTimeZone().getID());
 			}
 			else if (value instanceof BigDecimal){
-				 updatedFields.put(getBigDecimalAsStringFieldName(key), ((BigDecimal)value).toString());
+				 updatedFields.put(MONGO_BIGDECIMAL_FIELD_PREFIX + key, ((BigDecimal)value).toString());
 			}
 			else if (value != null) {
 				updatedFields.put(key, value);
@@ -102,19 +107,20 @@ public class MongoUtils {
 			else if (val instanceof Date){
 				Calendar cal = new GregorianCalendar();
 				cal.setTime((Date)val);
-				String tzField = getTimezoneFieldName(key);
+				String tzKey = MONGO_TIMEZONE_FIELD_PREFIX + key;
 				// Was this date stored as a Calendar? 
 				// If so we'll have a secondary field _:field:timezone that holds
 				// the timezone id.
-				if (dbo.keySet().contains(tzField)){
-					toRemove.add(tzField);
-					cal.setTimeZone(TimeZone.getTimeZone((String)dbo.get(tzField)));
+				if (dbo.keySet().contains(tzKey)){
+					toRemove.add(tzKey);
+					cal.setTimeZone(TimeZone.getTimeZone((String)dbo.get(tzKey)));
 				}
 				map.put(key, cal);
 			}
 			// Convert serialized BigDecimal values back to BigDecimal
-			else if (key.startsWith(BIGDECIMAL_ASSTRING)){
-				String bdKey = key.substring(BIGDECIMAL_ASSTRING.length() + 1);
+			else if (key.startsWith(MONGO_BIGDECIMAL_FIELD_PREFIX)){
+				String[] spl = key.split(":");
+				String bdKey = spl[spl.length - 1];
 				map.put(bdKey, new BigDecimal((String)val));
 				toRemove.add(key);
 			}
@@ -166,13 +172,5 @@ public class MongoUtils {
 		fieldName = fieldName.replaceAll(MONGO_FIELD_DOT_REPLACEMENT, ".");
 		fieldName = fieldName.replaceAll(MONGO_FIELD_DOLLAR_REPLACEMENT, Matcher.quoteReplacement("$"));
 		return fieldName;
-	}
-
-	private static String getTimezoneFieldName(String calendarFieldname){
-		return InternalContent.INTERNAL_FIELD_PREFIX + calendarFieldname + ":timezone";
-	}
-
-	private static String getBigDecimalAsStringFieldName(String fieldname){
-		return BIGDECIMAL_ASSTRING + fieldname;
 	}
 }
