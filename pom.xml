@@ -19,9 +19,9 @@
     <wagon.s3.version>1.1.10</wagon.s3.version>
   </properties>
   <scm>
-		<connection>scm:git:git://github.com/rSmart/solr.git</connection>
-		<developerConnection>scm:git:git@github.com:rSmart/solr.git</developerConnection>
-		<url>http://github.com/rSmart/solr/</url>
+		<connection>scm:git:git://github.com/rSmart/sparsemapcontent.git</connection>
+		<developerConnection>scm:git:git@github.com:rSmart/sparsemapcontent.git</developerConnection>
+		<url>http://github.com/rSmart/sparsemapcontent/</url>
   </scm>
   <prerequisites>
     <maven>2.2.1</maven>
